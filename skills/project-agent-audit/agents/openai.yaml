@@ -1,0 +1,6 @@
+interface:
+  display_name: "Project Agent Audit"
+  short_description: "Audit agent policy, routing, and guardrails"
+  default_prompt: "Use $project-agent-audit to review and improve this repository AI setup."
+policy:
+  allow_implicit_invocation: true

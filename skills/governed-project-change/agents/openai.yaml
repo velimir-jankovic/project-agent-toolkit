@@ -1,0 +1,6 @@
+interface:
+  display_name: "Governed Project Change"
+  short_description: "Execute changes with scoped policy and proof"
+  default_prompt: "Use $governed-project-change to implement this change under the repository governance contract."
+policy:
+  allow_implicit_invocation: true

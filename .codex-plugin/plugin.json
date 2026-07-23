@@ -1,0 +1,24 @@
+{
+  "name": "project-agent-toolkit",
+  "version": "0.2.0+codex.20260723062919",
+  "description": "Project-neutral agent governance, routing, auditing, and handoff workflows.",
+  "author": {
+    "name": "Project Agent Toolkit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Project Agent Toolkit",
+    "shortDescription": "Keep repository agent policy concise and verifiable.",
+    "longDescription": "Bootstrap, audit, route, execute, and hand off project work without mixing reusable agent process with project-specific policy.",
+    "developerName": "Project Agent Toolkit contributors",
+    "category": "Developer Tools",
+    "brandColor": "#3A86A8",
+    "capabilities": [
+      "Project governance bootstrap",
+      "Instruction and context audits",
+      "Task-scoped policy routing",
+      "Evidence-backed handoffs"
+    ],
+    "defaultPrompt": "Audit this repository's agent setup, identify context and authority problems, and propose the smallest safe improvement."
+  }
+}

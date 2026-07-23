@@ -1,0 +1,6 @@
+interface:
+  display_name: "Project Agent Bootstrap"
+  short_description: "Install concise project agent governance"
+  default_prompt: "Use $project-agent-bootstrap to set up maintainable agent governance in this repository."
+policy:
+  allow_implicit_invocation: true

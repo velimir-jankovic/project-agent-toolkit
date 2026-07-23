@@ -1,0 +1,182 @@
+{
+  "version": 2,
+  "project": {
+    "name": "Project"
+  },
+  "entrypoints": [
+    "AGENTS.md",
+    ".github/copilot-instructions.md"
+  ],
+  "adapters": {
+    "outputs": [
+      {
+        "kind": "agents",
+        "path": "AGENTS.md"
+      },
+      {
+        "kind": "copilot",
+        "path": ".github/copilot-instructions.md"
+      }
+    ]
+  },
+  "authorities": [
+    {
+      "id": "architecture",
+      "path": "docs/ARCHITECTURE.md",
+      "purpose": "System boundaries and design decisions",
+      "always": false
+    },
+    {
+      "id": "rules",
+      "path": "RULES.md",
+      "purpose": "Non-negotiable repository constraints",
+      "always": true
+    },
+    {
+      "id": "workflow",
+      "path": "docs/WORKFLOW.md",
+      "purpose": "How work is planned, changed, verified, and handed off",
+      "always": true
+    },
+    {
+      "id": "state",
+      "path": "PROGRESS.md",
+      "purpose": "Current objective, verified state, and next action",
+      "always": false
+    }
+  ],
+  "routes": [
+    {
+      "id": "architecture",
+      "terms": [
+        "architecture",
+        "design",
+        "public api",
+        "schema",
+        "protocol",
+        "dependency"
+      ],
+      "paths": [],
+      "read": [
+        "architecture",
+        "rules",
+        "workflow",
+        "state"
+      ],
+      "validation": [
+        "fast"
+      ]
+    },
+    {
+      "id": "implementation",
+      "terms": [
+        "implement",
+        "change",
+        "fix",
+        "build",
+        "refactor"
+      ],
+      "paths": [],
+      "read": [
+        "rules",
+        "workflow",
+        "state"
+      ],
+      "validation": [
+        "fast"
+      ]
+    },
+    {
+      "id": "default",
+      "terms": [],
+      "paths": [
+        "**/*"
+      ],
+      "read": [
+        "rules",
+        "workflow"
+      ],
+      "validation": [
+        "fast"
+      ]
+    }
+  ],
+  "route_tests": [
+    {
+      "id": "architecture-route",
+      "task": "review the architecture",
+      "paths": [],
+      "expect_routes": [
+        "architecture"
+      ],
+      "expect_documents": [
+        "RULES.md",
+        "docs/WORKFLOW.md",
+        "docs/ARCHITECTURE.md",
+        "PROGRESS.md"
+      ],
+      "expect_validation_profiles": [
+        "fast"
+      ]
+    },
+    {
+      "id": "implementation-route",
+      "task": "implement a change",
+      "paths": [],
+      "expect_routes": [
+        "implementation"
+      ],
+      "expect_documents": [
+        "RULES.md",
+        "docs/WORKFLOW.md",
+        "PROGRESS.md"
+      ],
+      "expect_validation_profiles": [
+        "fast"
+      ]
+    },
+    {
+      "id": "default-route",
+      "task": "summarize the project",
+      "paths": [],
+      "expect_routes": [
+        "default"
+      ],
+      "expect_documents": [
+        "RULES.md",
+        "docs/WORKFLOW.md"
+      ],
+      "expect_validation_profiles": [
+        "fast"
+      ]
+    }
+  ],
+  "rules": [],
+  "limits": {
+    "entrypoint_max_lines": 120,
+    "always_loaded_max_chars": 30000,
+    "duplicate_paragraph_min_chars": 180
+  },
+  "tooling": {
+    "roots": [
+      ".codex"
+    ],
+    "allowed": [
+      ".codex/config.toml",
+      ".codex/agents/*.toml"
+    ]
+  },
+  "validation": {
+    "default_profiles": [
+      "fast"
+    ],
+    "profiles": {
+      "fast": {
+        "commands": []
+      }
+    }
+  },
+  "evidence": {
+    "directory": ".agent-evidence"
+  }
+}
