@@ -18,3 +18,8 @@ allowlist, and optional validation commands.
 No target project imports this repository as runtime application code.
 Marketplace installation supplies skills and their packaged CLI; contributors
 can also invoke that CLI directly from the source tree.
+
+Optional development interfaces, including MCP control surfaces, are declared
+as project governance data. The toolkit validates their activation and guard
+contracts; the target project owns the public API, adapter implementation, and
+runtime proofs.

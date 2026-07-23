@@ -101,7 +101,7 @@ class GovernanceTests(unittest.TestCase):
             findings = governance.route_test_findings(config)
             self.assertIn("route-test.failed", {finding.code for finding in findings})
 
-    def test_upgrade_preserves_existing_policy_and_adds_v2_contracts(self) -> None:
+    def test_upgrade_preserves_existing_policy_and_adds_current_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             governance.initialize(root, "minimal", False)
@@ -120,12 +120,67 @@ class GovernanceTests(unittest.TestCase):
             self.assertEqual(migrated["version"], governance.CURRENT_VERSION)
             self.assertEqual(migrated["authorities"], config["authorities"])
             self.assertIn("adapters", migrated)
+            self.assertEqual(migrated["development_interfaces"], [])
             self.assertEqual(len(migrated["route_tests"]), len(config["routes"]))
             self.assertFalse(governance.route_test_findings(migrated))
             self.assertEqual(
                 migrated["validation"]["profiles"]["fast"]["commands"][0]["run"],
                 "python -V",
             )
+
+    def test_upgrade_from_v2_adds_development_interfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "minimal", False)
+            config = json.loads(root.joinpath(".agent-governance.json").read_text(encoding="utf-8"))
+            config["version"] = 2
+            config.pop("development_interfaces")
+
+            migrated = governance.migrate_config(config)
+
+            self.assertEqual(migrated["version"], governance.CURRENT_VERSION)
+            self.assertEqual(migrated["development_interfaces"], [])
+            self.assertEqual(migrated["authorities"], config["authorities"])
+
+    def test_mcp_development_interface_requires_safe_activation_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "minimal", False)
+            config_path = root / ".agent-governance.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["development_interfaces"] = [
+                {
+                    "id": "editor-mcp",
+                    "protocol": "mcp",
+                    "activation_flag": "--enable-editor-mcp",
+                    "default_enabled": False,
+                    "production_allowed": False,
+                    "guard_profiles": ["fast"],
+                }
+            ]
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+            findings, metrics = governance.audit(root)
+            self.assertFalse(
+                [
+                    finding
+                    for finding in findings
+                    if finding.code.startswith("development-interface.")
+                ],
+                findings,
+            )
+            self.assertEqual(metrics["development_interface_count"], 1)
+
+            config["development_interfaces"][0]["activation_flag"] = ""
+            config["development_interfaces"][0]["default_enabled"] = True
+            config["development_interfaces"][0]["guard_profiles"] = ["missing"]
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+            findings, _ = governance.audit(root)
+            codes = {finding.code for finding in findings}
+            self.assertIn("development-interface.activation-flag", codes)
+            self.assertIn("development-interface.default-enabled", codes)
+            self.assertIn("development-interface.unknown-profile", codes)
 
     def test_invalid_adapter_shape_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

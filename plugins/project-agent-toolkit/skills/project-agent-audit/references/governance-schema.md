@@ -1,7 +1,7 @@
 # Governance configuration
 
 `.agent-governance.json` is project data consumed by the toolkit. Schema
-version `2` is current.
+version `3` is current.
 
 ## Top level
 
@@ -13,6 +13,8 @@ version `2` is current.
 - `routes`: task/path routing to authorities and validation profiles.
 - `route_tests`: deterministic routing contracts.
 - `rules`: registered durable rules and their guards.
+- `development_interfaces`: optional development-only control surfaces,
+  including MCP activation and production policy.
 - `limits`: context and duplication budgets.
 - `tooling`: configuration roots and files allowed inside them.
 - `validation`: named, composable validation profiles.
@@ -132,6 +134,25 @@ governance-file digest, UTC timestamp, version-control revision and dirty-state
 digest when Git is available, routing result, selected profiles, claims,
 commands, proof statements, exit codes, durations, and stdout/stderr hashes.
 Command output itself is not persisted.
+
+## Development interface
+
+```json
+{
+  "id": "editor-mcp",
+  "protocol": "mcp",
+  "activation_flag": "--enable-editor-mcp",
+  "default_enabled": false,
+  "production_allowed": false,
+  "guard_profiles": ["focused", "release"]
+}
+```
+
+The activation flag is the single switch that starts the surface.
+`default_enabled` must be false. `guard_profiles` name project-owned checks
+that prove enabled behavior, disabled behavior, and—when
+`production_allowed` is false—release exclusion. The toolkit validates the
+declaration; those project checks validate the executable.
 
 ## Limits and tooling
 

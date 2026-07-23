@@ -1,7 +1,7 @@
 {
   "name": "project-agent-toolkit",
-  "version": "0.2.0+codex.20260723070710",
-  "description": "Project-neutral agent governance, routing, auditing, and handoff workflows.",
+  "version": "0.3.0+codex.20260723071754",
+  "description": "Project-neutral agent governance, routing, MCP development, auditing, and handoff workflows.",
   "author": {
     "name": "Velimir Jankovic",
     "url": "https://github.com/velimir-jankovic"
@@ -29,6 +29,7 @@
       "Project governance bootstrap",
       "Instruction and context audits",
       "Task-scoped policy routing",
+      "Development-only MCP contracts",
       "Evidence-backed handoffs"
     ],
     "defaultPrompt": [

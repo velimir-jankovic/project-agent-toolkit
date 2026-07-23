@@ -20,7 +20,7 @@ from urllib.parse import unquote
 
 
 CONFIG_NAME = ".agent-governance.json"
-CURRENT_VERSION = 2
+CURRENT_VERSION = 3
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE_ROOT = PLUGIN_ROOT / "assets" / "templates"
 MARKDOWN_LINK = re.compile(r"!?\[[^\]\n]+]\(([^)\n]+)\)")
@@ -189,6 +189,7 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         "always_loaded_chars": 0,
         "authority_count": 0,
         "route_count": 0,
+        "development_interface_count": 0,
     }
     if config is None:
         return findings, metrics
@@ -549,6 +550,146 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
             expand_validation_profiles(config, [selected])
         except ValueError as exc:
             findings.append(Finding("error", "validation.graph", str(exc), CONFIG_NAME))
+
+    development_interfaces = config.get("development_interfaces")
+    if not isinstance(development_interfaces, list):
+        findings.append(
+            Finding(
+                "error",
+                "config.development-interfaces",
+                "development_interfaces must be an array",
+                CONFIG_NAME,
+            )
+        )
+        development_interfaces = []
+    interface_ids: set[str] = set()
+    activation_flags: set[str] = set()
+    for index, interface in enumerate(development_interfaces):
+        if not isinstance(interface, dict):
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.invalid",
+                    f"development interface {index} must be an object",
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        identifier = interface.get("id")
+        if not isinstance(identifier, str) or not identifier.strip():
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.id",
+                    f"development interface {index} needs a non-empty id",
+                    CONFIG_NAME,
+                )
+            )
+        elif identifier in interface_ids:
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.duplicate",
+                    f"duplicate development interface id {identifier}",
+                    CONFIG_NAME,
+                )
+            )
+        else:
+            interface_ids.add(identifier)
+
+        protocol = interface.get("protocol")
+        if not isinstance(protocol, str) or not protocol.strip():
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.protocol",
+                    f"development interface {identifier or index} needs a protocol",
+                    CONFIG_NAME,
+                )
+            )
+
+        activation_flag = interface.get("activation_flag")
+        if not isinstance(activation_flag, str) or not activation_flag.strip():
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.activation-flag",
+                    (
+                        f"development interface {identifier or index} needs exactly one "
+                        "non-empty activation_flag"
+                    ),
+                    CONFIG_NAME,
+                )
+            )
+        elif activation_flag in activation_flags:
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.duplicate-flag",
+                    f"activation flag {activation_flag!r} is used more than once",
+                    CONFIG_NAME,
+                )
+            )
+        else:
+            activation_flags.add(activation_flag)
+
+        if interface.get("default_enabled") is not False:
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.default-enabled",
+                    (
+                        f"development interface {identifier or index} must set "
+                        "default_enabled to false"
+                    ),
+                    CONFIG_NAME,
+                )
+            )
+        if not isinstance(interface.get("production_allowed"), bool):
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.production-policy",
+                    (
+                        f"development interface {identifier or index} must explicitly set "
+                        "production_allowed"
+                    ),
+                    CONFIG_NAME,
+                )
+            )
+
+        guard_profiles = interface.get("guard_profiles")
+        if (
+            not isinstance(guard_profiles, list)
+            or not guard_profiles
+            or not all(isinstance(profile, str) and profile for profile in guard_profiles)
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    "development-interface.guards",
+                    (
+                        f"development interface {identifier or index} needs one or more "
+                        "guard_profiles"
+                    ),
+                    CONFIG_NAME,
+                )
+            )
+        else:
+            for guard_profile in guard_profiles:
+                if guard_profile not in profile_ids:
+                    findings.append(
+                        Finding(
+                            "error",
+                            "development-interface.unknown-profile",
+                            (
+                                f"development interface {identifier or index} references "
+                                f"unknown validation profile {guard_profile}"
+                            ),
+                            CONFIG_NAME,
+                        )
+                    )
+    metrics["development_interface_count"] = len(interface_ids)
 
     adapters = config.get("adapters", {})
     if not isinstance(adapters, dict) or not isinstance(adapters.get("outputs", []), list):
@@ -1108,6 +1249,12 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         for rule in config.get("rules", [])
         if isinstance(rule, dict) and rule.get("guard")
     )
+    referenced_profiles.update(
+        str(profile)
+        for interface in config.get("development_interfaces", [])
+        if isinstance(interface, dict)
+        for profile in interface.get("guard_profiles", [])
+    )
     unguarded_rules = [
         str(rule.get("id", "<unnamed>"))
         for rule in config.get("rules", [])
@@ -1136,65 +1283,69 @@ def migrate_config(config: dict[str, Any]) -> dict[str, Any]:
     version = config.get("version")
     if version == CURRENT_VERSION:
         return config
-    if version != 1:
+    if version not in {1, 2}:
         raise ValueError(f"cannot migrate configuration version {version!r}")
     migrated = json.loads(json.dumps(config))
-    migrated["version"] = CURRENT_VERSION
-    migrated.setdefault("project", {"name": "Project"})
-    migrated.setdefault(
-        "adapters",
-        {
-            "outputs": [
-                {"kind": "agents", "path": "AGENTS.md"},
-                {"kind": "copilot", "path": ".github/copilot-instructions.md"},
-            ]
-        },
-    )
-    old_commands = migrated.get("validation", {}).pop("commands", [])
-    validation = migrated.setdefault("validation", {})
-    validation.setdefault(
-        "profiles",
-        {
-            "fast": {
-                "commands": [
-                    {
-                        "run": command,
-                        "proves": "Project-configured fast validation",
-                    }
-                    for command in old_commands
-                ]
-            }
-        },
-    )
-    validation.setdefault("default_profiles", ["fast"])
-    route_tests = []
-    for route in migrated.get("routes", []):
-        if not isinstance(route, dict) or not route.get("id"):
-            continue
-        route.setdefault("validation", ["fast"])
-        terms = route.get("terms", [])
-        paths = route.get("paths", [])
-        test_task = str(terms[0]) if terms else ""
-        test_paths = [str(paths[0])] if paths and route["id"] != "default" else []
-        route_tests.append(
+    if version == 1:
+        migrated["version"] = 2
+        migrated.setdefault("project", {"name": "Project"})
+        migrated.setdefault(
+            "adapters",
             {
-                "id": f"{route['id']}-route",
-                "task": test_task,
-                "paths": test_paths,
-            }
+                "outputs": [
+                    {"kind": "agents", "path": "AGENTS.md"},
+                    {"kind": "copilot", "path": ".github/copilot-instructions.md"},
+                ]
+            },
         )
-    for route_test in route_tests:
-        actual = route_details(
-            migrated,
-            str(route_test["task"]),
-            [str(path) for path in route_test["paths"]],
+        old_commands = migrated.get("validation", {}).pop("commands", [])
+        validation = migrated.setdefault("validation", {})
+        validation.setdefault(
+            "profiles",
+            {
+                "fast": {
+                    "commands": [
+                        {
+                            "run": command,
+                            "proves": "Project-configured fast validation",
+                        }
+                        for command in old_commands
+                    ]
+                }
+            },
         )
-        route_test["expect_routes"] = actual["routes"]
-        route_test["expect_documents"] = actual["documents"]
-        route_test["expect_validation_profiles"] = actual["validation_profiles"]
-    migrated.setdefault("route_tests", route_tests)
-    migrated.setdefault("rules", [])
-    migrated.setdefault("evidence", {"directory": ".agent-evidence"})
+        validation.setdefault("default_profiles", ["fast"])
+        route_tests = []
+        for route in migrated.get("routes", []):
+            if not isinstance(route, dict) or not route.get("id"):
+                continue
+            route.setdefault("validation", ["fast"])
+            terms = route.get("terms", [])
+            paths = route.get("paths", [])
+            test_task = str(terms[0]) if terms else ""
+            test_paths = [str(paths[0])] if paths and route["id"] != "default" else []
+            route_tests.append(
+                {
+                    "id": f"{route['id']}-route",
+                    "task": test_task,
+                    "paths": test_paths,
+                }
+            )
+        for route_test in route_tests:
+            actual = route_details(
+                migrated,
+                str(route_test["task"]),
+                [str(path) for path in route_test["paths"]],
+            )
+            route_test["expect_routes"] = actual["routes"]
+            route_test["expect_documents"] = actual["documents"]
+            route_test["expect_validation_profiles"] = actual["validation_profiles"]
+        migrated.setdefault("route_tests", route_tests)
+        migrated.setdefault("rules", [])
+        migrated.setdefault("evidence", {"directory": ".agent-evidence"})
+
+    migrated["version"] = CURRENT_VERSION
+    migrated.setdefault("development_interfaces", [])
     return migrated
 
 

@@ -142,8 +142,8 @@ def check_governance_contract(errors: list[str]) -> None:
     except (OSError, json.JSONDecodeError) as exc:
         fail(errors, f"{path.relative_to(ROOT)}: invalid governance config: {exc}")
         return
-    if config.get("version") != 2:
-        fail(errors, f"{path.relative_to(ROOT)}: schema version must be 2")
+    if config.get("version") != 3:
+        fail(errors, f"{path.relative_to(ROOT)}: schema version must be 3")
 
     outputs = config.get("adapters", {}).get("outputs", [])
     expected = {

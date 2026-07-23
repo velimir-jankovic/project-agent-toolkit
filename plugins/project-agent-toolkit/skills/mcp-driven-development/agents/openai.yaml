@@ -1,0 +1,6 @@
+interface:
+  display_name: "MCP-Driven Development"
+  short_description: "Build safe development-only MCP control surfaces"
+  default_prompt: "Use $mcp-driven-development to design or verify an opt-in MCP development surface."
+policy:
+  allow_implicit_invocation: true

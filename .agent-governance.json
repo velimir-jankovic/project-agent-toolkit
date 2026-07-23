@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "project": {
     "name": "Project Agent Toolkit"
   },
@@ -180,8 +180,15 @@
       "authority": "rules",
       "source": "RULES.md#project-agent-toolkit-rules",
       "guard": "release"
+    },
+    {
+      "id": "mcp-development-opt-in",
+      "authority": "rules",
+      "source": "RULES.md#project-agent-toolkit-rules",
+      "guard": "release"
     }
   ],
+  "development_interfaces": [],
   "limits": {
     "entrypoint_max_lines": 120,
     "always_loaded_max_chars": 30000,

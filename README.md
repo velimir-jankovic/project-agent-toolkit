@@ -31,6 +31,9 @@ layout. Projects describe their own policy in `.agent-governance.json`.
   duplicated policy, and tooling-directory pollution.
 - `governed-project-change` routes a task to only the relevant policy and
   requires proportionate evidence.
+- `mcp-driven-development` defines an optional semantic MCP control surface
+  over project-owned public APIs, enabled by one explicit flag and disabled by
+  default.
 - `project-agent-handoff` creates compact, honest resume checkpoints.
 
 ## CLI
@@ -106,6 +109,8 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - Generated adapters have one source of truth.
 - Route behavior is contract-tested with representative tasks.
 - Validation claims are revision-bound evidence, not remembered terminal output.
+- MCP development surfaces are optional adapters, not runtime authority, and
+  remain off unless their one declared activation flag is present.
 - "Done" means the requested outcome exists and current evidence supports it.
 - Handoffs preserve decisions and next actions, not chat transcripts.
 

@@ -11,3 +11,6 @@
 - Every configuration path and route is validated mechanically.
 - Changes pass `python scripts/quality.py` before completion is claimed.
 - A check that did not run is not reported as evidence.
+- MCP development surfaces are thin adapters over public project APIs, use one
+  explicit activation flag, default to disabled, and require a release guard
+  when production activation is forbidden.

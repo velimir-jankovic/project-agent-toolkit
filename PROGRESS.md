@@ -13,6 +13,8 @@ Deliver the first reusable, project-neutral Project Agent Toolkit release.
 - Unit, structure, governance, hook, and CI guards are present.
 - Generated adapters, route contracts, validation profiles, revision-bound
   evidence receipts, versioned migrations, and coverage reporting implemented.
+- Optional MCP-driven development contract and production-off activation model
+  implemented.
 
 ## Open risks
 
