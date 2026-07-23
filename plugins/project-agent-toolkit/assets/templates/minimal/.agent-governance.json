@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "project": {
     "name": "Project"
   },
@@ -102,7 +102,18 @@
         "layout",
         "scene",
         "map",
-        "terrain"
+        "terrain",
+        "css",
+        "style",
+        "font",
+        "icon",
+        "responsive",
+        "material",
+        "texture",
+        "shader",
+        "lighting",
+        "camera",
+        "art"
       ],
       "paths": [],
       "read": [
@@ -204,7 +215,10 @@
       "visual"
     ],
     "artifact_min_count": 1,
-    "require_review": true
+    "min_review_checks": 1,
+    "artifact_max_age_seconds": 3600,
+    "require_review": true,
+    "require_surface": true
   },
   "limits": {
     "entrypoint_max_lines": 120,

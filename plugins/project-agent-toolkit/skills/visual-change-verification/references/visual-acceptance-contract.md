@@ -31,9 +31,19 @@ state or viewport.
 ## Rejection conditions
 
 - Artifact predates the current change.
+- Artifact is malformed, stale, has invalid dimensions, or lacks acceptance
+  surface metadata.
 - Artifact comes from a mock instead of the acceptance surface.
 - Only source code, unit tests, or build output is supplied.
 - Review says “looks good” without a specific check.
 - A referenced state, viewport, or camera with materially different behavior is
   missing.
 - The reviewer identifies an unresolved acceptance defect.
+
+## Mechanical boundary
+
+The CLI validates container structure, recency, declared-path ordering,
+dimensions where available, hashes, surface metadata, and concrete review
+statements. It cannot infer artistic quality or prove semantic relevance from
+pixels alone. The reviewer remains accountable for inspecting the real surface
+and comparing it with the named reference.

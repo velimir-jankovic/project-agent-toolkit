@@ -93,6 +93,32 @@ def check_templates(errors: list[str]) -> None:
         if not (template_root / relative).is_file():
             fail(errors, f"assets/templates/{relative}: required template missing")
 
+    config_path = template_root / "minimal" / ".agent-governance.json"
+    try:
+        template_config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(errors, f"{config_path.relative_to(ROOT)}: invalid template config: {exc}")
+    else:
+        if template_config.get("version") != 4:
+            fail(errors, f"{config_path.relative_to(ROOT)}: schema version must be 4")
+        visual = template_config.get("visual_validation", {})
+        for required_field in (
+            "routes",
+            "artifact_min_count",
+            "min_review_checks",
+            "artifact_max_age_seconds",
+            "require_review",
+            "require_surface",
+        ):
+            if required_field not in visual:
+                fail(
+                    errors,
+                    (
+                        f"{config_path.relative_to(ROOT)}: visual_validation "
+                        f"missing {required_field}"
+                    ),
+                )
+
     for path in template_root.rglob("*"):
         if not path.is_file():
             continue
@@ -142,8 +168,8 @@ def check_governance_contract(errors: list[str]) -> None:
     except (OSError, json.JSONDecodeError) as exc:
         fail(errors, f"{path.relative_to(ROOT)}: invalid governance config: {exc}")
         return
-    if config.get("version") != 3:
-        fail(errors, f"{path.relative_to(ROOT)}: schema version must be 3")
+    if config.get("version") != 4:
+        fail(errors, f"{path.relative_to(ROOT)}: schema version must be 4")
 
     outputs = config.get("adapters", {}).get("outputs", [])
     expected = {

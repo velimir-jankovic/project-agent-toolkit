@@ -8,7 +8,9 @@ Prefer a guard or test for every rule that can be checked automatically.
 - Preserve unrelated work.
 - Do not bypass validation or hooks to make a change appear complete.
 - Do not hide missing shared capability in a consumer-local workaround.
-- Do not claim evidence that was not produced from the current revision.
+- Do not claim evidence that was not produced from the current source contents.
+- Visual work requires fresh rendered evidence from the actual acceptance
+  surface and concrete inspection checks.
 
 ## Repository-specific rules
 

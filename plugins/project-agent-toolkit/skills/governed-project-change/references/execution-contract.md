@@ -28,6 +28,10 @@ Use the lowest sufficient rung, then move upward with risk:
 
 Higher rungs do not excuse missing focused regression coverage.
 
+Evidence v2 hashes the tracked diff and untracked file contents. Validation
+must leave the tested project and supplied visual artifacts unchanged; a
+mutating guard produces a failed receipt.
+
 For configured visual routes, compile and test commands are incomplete
 evidence. The verification receipt must also contain current rendered
 artifacts, their hashes, concrete inspection checks, and a passing visual

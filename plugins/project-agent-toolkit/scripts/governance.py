@@ -9,9 +9,11 @@ import hashlib
 import json
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import time
+import zlib
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -20,7 +22,7 @@ from urllib.parse import unquote
 
 
 CONFIG_NAME = ".agent-governance.json"
-CURRENT_VERSION = 3
+CURRENT_VERSION = 4
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE_ROOT = PLUGIN_ROOT / "assets" / "templates"
 MARKDOWN_LINK = re.compile(r"!?\[[^\]\n]+]\(([^)\n]+)\)")
@@ -34,6 +36,22 @@ VISUAL_ARTIFACT_EXTENSIONS = {
     ".png",
     ".webm",
     ".webp",
+}
+MCP_GUARD_KINDS = (
+    "disabled",
+    "enabled",
+    "parity",
+    "lifecycle",
+    "performance",
+)
+VISUAL_GENERIC_CHECKS = {
+    "fine",
+    "good",
+    "looks fine",
+    "looks good",
+    "ok",
+    "pass",
+    "passed",
 }
 
 
@@ -69,6 +87,60 @@ def line_count(path: Path) -> int:
     return len(path.read_text(encoding="utf-8").splitlines())
 
 
+def configured_positive_int(
+    value: Any,
+    fallback: int,
+    findings: list[Finding],
+    code: str,
+    message: str,
+) -> int:
+    if isinstance(value, bool):
+        findings.append(Finding("error", code, message, CONFIG_NAME))
+        return fallback
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        findings.append(Finding("error", code, message, CONFIG_NAME))
+        return fallback
+    if parsed < 1:
+        findings.append(Finding("error", code, message, CONFIG_NAME))
+        return fallback
+    return parsed
+
+
+def ensure_evidence_ignore(root: Path) -> bool:
+    """Add the default transient receipt directory to Git ignore additively."""
+    path = root / ".gitignore"
+    entry = ".agent-evidence/"
+    current = path.read_text(encoding="utf-8") if path.exists() else ""
+    normalized = {
+        line.strip().replace("\\", "/")
+        for line in current.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    if entry in normalized or entry.rstrip("/") in normalized:
+        return False
+    prefix = "" if not current or current.endswith("\n") else "\n"
+    block = f"{prefix}# Project Agent Toolkit transient evidence\n{entry}\n"
+    path.write_text(current + block, encoding="utf-8")
+    return True
+
+
+def git_ignores_path(root: Path, path: Path) -> bool:
+    """Return whether Git excludes a path that may not exist yet."""
+    try:
+        relative = posix(path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return False
+    result = subprocess.run(
+        ["git", "check-ignore", "--quiet", relative],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def iter_template_files(profile: str) -> Iterable[tuple[Path, Path]]:
     for source_root in (TEMPLATE_ROOT / "minimal", TEMPLATE_ROOT / profile):
         if not source_root.exists():
@@ -95,6 +167,8 @@ def initialize(root: Path, profile: str, force: bool) -> int:
         shutil.copyfile(source, target)
         written.append(key)
 
+    ignore_updated = ensure_evidence_ignore(root)
+
     print(f"Initialized governance in {root}")
     if written:
         print("Created:")
@@ -104,7 +178,13 @@ def initialize(root: Path, profile: str, force: bool) -> int:
         print("Preserved existing files:")
         for path in preserved:
             print(f"  {path}")
-    print("Next: customize .agent-governance.json, then run `governance.py audit`.")
+    if ignore_updated:
+        print("Updated additively:")
+        print("  .gitignore")
+    print(
+        "Next: configure at least one real validation command in "
+        ".agent-governance.json, then run `governance.py check`."
+    )
     return 0
 
 
@@ -230,9 +310,27 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
     if not isinstance(limits, dict):
         findings.append(Finding("error", "config.limits", "limits must be an object", CONFIG_NAME))
         limits = {}
-    entrypoint_limit = int(limits.get("entrypoint_max_lines", 120))
-    context_limit = int(limits.get("always_loaded_max_chars", 30000))
-    duplicate_min = int(limits.get("duplicate_paragraph_min_chars", 180))
+    entrypoint_limit = configured_positive_int(
+        limits.get("entrypoint_max_lines", 120),
+        120,
+        findings,
+        "limits.entrypoint-max-lines",
+        "limits.entrypoint_max_lines must be a positive integer",
+    )
+    context_limit = configured_positive_int(
+        limits.get("always_loaded_max_chars", 30000),
+        30000,
+        findings,
+        "limits.always-loaded-max-chars",
+        "limits.always_loaded_max_chars must be a positive integer",
+    )
+    duplicate_min = configured_positive_int(
+        limits.get("duplicate_paragraph_min_chars", 180),
+        180,
+        findings,
+        "limits.duplicate-paragraph-min-chars",
+        "limits.duplicate_paragraph_min_chars must be a positive integer",
+    )
 
     entrypoints = config.get("entrypoints", [])
     if not isinstance(entrypoints, list) or not all(isinstance(x, str) for x in entrypoints):
@@ -433,20 +531,27 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
                         CONFIG_NAME,
                     )
                 )
-        artifact_min_count = visual_validation.get("artifact_min_count", 1)
-        if (
-            not isinstance(artifact_min_count, int)
-            or isinstance(artifact_min_count, bool)
-            or artifact_min_count < 1
-        ):
-            findings.append(
-                Finding(
-                    "error",
-                    "visual-validation.artifact-count",
-                    "visual_validation.artifact_min_count must be a positive integer",
-                    CONFIG_NAME,
-                )
-            )
+        configured_positive_int(
+            visual_validation.get("artifact_min_count", 1),
+            1,
+            findings,
+            "visual-validation.artifact-count",
+            "visual_validation.artifact_min_count must be a positive integer",
+        )
+        configured_positive_int(
+            visual_validation.get("min_review_checks", 1),
+            1,
+            findings,
+            "visual-validation.review-count",
+            "visual_validation.min_review_checks must be a positive integer",
+        )
+        configured_positive_int(
+            visual_validation.get("artifact_max_age_seconds", 3600),
+            3600,
+            findings,
+            "visual-validation.artifact-age",
+            "visual_validation.artifact_max_age_seconds must be a positive integer",
+        )
         require_review = visual_validation.get("require_review", True)
         if visual_routes and require_review is not True:
             findings.append(
@@ -454,6 +559,16 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
                     "error",
                     "visual-validation.review",
                     "configured visual routes must require an explicit review",
+                    CONFIG_NAME,
+                )
+            )
+        require_surface = visual_validation.get("require_surface", True)
+        if visual_routes and require_surface is not True:
+            findings.append(
+                Finding(
+                    "error",
+                    "visual-validation.surface",
+                    "configured visual routes must require acceptance-surface metadata",
                     CONFIG_NAME,
                 )
             )
@@ -608,7 +723,7 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
             )
         )
         defaults = []
-    for selected in [
+    routed_profile_ids = [
         *defaults,
         *[
             profile
@@ -616,7 +731,8 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
             if isinstance(route, dict)
             for profile in route.get("validation", [])
         ],
-    ]:
+    ]
+    for selected in routed_profile_ids:
         if selected not in profile_ids:
             findings.append(
                 Finding(
@@ -631,6 +747,25 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
             expand_validation_profiles(config, [selected])
         except ValueError as exc:
             findings.append(Finding("error", "validation.graph", str(exc), CONFIG_NAME))
+    for selected in dict.fromkeys(str(item) for item in routed_profile_ids):
+        if selected not in profile_ids:
+            continue
+        try:
+            _, expanded_commands = expand_validation_profiles(config, [selected])
+        except ValueError:
+            continue
+        if not expanded_commands:
+            findings.append(
+                Finding(
+                    "warning",
+                    "validation.no-executable-commands",
+                    (
+                        f"routed validation profile {selected} expands to no commands; "
+                        "verification cannot succeed until project-owned checks are configured"
+                    ),
+                    CONFIG_NAME,
+                )
+            )
 
     development_interfaces = config.get("development_interfaces")
     if not isinstance(development_interfaces, list):
@@ -726,7 +861,8 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
                     CONFIG_NAME,
                 )
             )
-        if not isinstance(interface.get("production_allowed"), bool):
+        production_allowed = interface.get("production_allowed")
+        if not isinstance(production_allowed, bool):
             findings.append(
                 Finding(
                     "error",
@@ -740,25 +876,68 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
             )
 
         guard_profiles = interface.get("guard_profiles")
-        if (
-            not isinstance(guard_profiles, list)
-            or not guard_profiles
-            or not all(isinstance(profile, str) and profile for profile in guard_profiles)
-        ):
-            findings.append(
-                Finding(
-                    "error",
-                    "development-interface.guards",
-                    (
-                        f"development interface {identifier or index} needs one or more "
-                        "guard_profiles"
-                    ),
-                    CONFIG_NAME,
+        if str(protocol).lower() == "mcp":
+            required_guard_kinds = list(MCP_GUARD_KINDS)
+            if production_allowed is False:
+                required_guard_kinds.append("release")
+            if not isinstance(guard_profiles, dict):
+                findings.append(
+                    Finding(
+                        "error",
+                        "development-interface.guards",
+                        (
+                            f"MCP development interface {identifier or index} must map "
+                            "each required proof kind to validation profiles"
+                        ),
+                        CONFIG_NAME,
+                    )
                 )
+                guard_profiles = {}
+            unknown_kinds = sorted(
+                str(kind)
+                for kind in guard_profiles
+                if kind not in {*MCP_GUARD_KINDS, "release"}
             )
-        else:
-            for guard_profile in guard_profiles:
-                if guard_profile not in profile_ids:
+            if unknown_kinds:
+                findings.append(
+                    Finding(
+                        "error",
+                        "development-interface.unknown-proof-kind",
+                        (
+                            f"MCP development interface {identifier or index} has unknown "
+                            f"proof kinds: {', '.join(unknown_kinds)}"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+            for guard_kind in required_guard_kinds:
+                selected_profiles = guard_profiles.get(guard_kind)
+                if (
+                    not isinstance(selected_profiles, list)
+                    or not selected_profiles
+                    or not all(
+                        isinstance(profile, str) and profile
+                        for profile in selected_profiles
+                    )
+                ):
+                    findings.append(
+                        Finding(
+                            "error",
+                            "development-interface.missing-proof",
+                            (
+                                f"MCP development interface {identifier or index} needs "
+                                f"non-empty {guard_kind!r} guard profiles"
+                            ),
+                            CONFIG_NAME,
+                        )
+                    )
+                    continue
+                unknown_profiles = [
+                    profile
+                    for profile in selected_profiles
+                    if profile not in profile_ids
+                ]
+                for guard_profile in unknown_profiles:
                     findings.append(
                         Finding(
                             "error",
@@ -770,6 +949,101 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
                             CONFIG_NAME,
                         )
                     )
+                if unknown_profiles:
+                    continue
+                try:
+                    _, guard_commands = expand_validation_profiles(
+                        config,
+                        selected_profiles,
+                    )
+                except ValueError:
+                    continue
+                if not guard_commands:
+                    findings.append(
+                        Finding(
+                            "error",
+                            "development-interface.empty-proof",
+                            (
+                                f"MCP development interface {identifier or index} "
+                                f"{guard_kind!r} profiles expand to no commands"
+                            ),
+                            CONFIG_NAME,
+                        )
+                    )
+                elif not any(
+                    task_term_matches(proves, guard_kind)
+                    for _, proves in guard_commands
+                    if proves
+                ):
+                    findings.append(
+                        Finding(
+                            "error",
+                            "development-interface.unproven-category",
+                            (
+                                f"MCP development interface {identifier or index} "
+                                f"{guard_kind!r} profiles do not explicitly say they "
+                                f"prove {guard_kind}"
+                            ),
+                            CONFIG_NAME,
+                        )
+                    )
+        else:
+            if (
+                not isinstance(guard_profiles, list)
+                or not guard_profiles
+                or not all(
+                    isinstance(profile, str) and profile
+                    for profile in guard_profiles
+                )
+            ):
+                findings.append(
+                    Finding(
+                        "error",
+                        "development-interface.guards",
+                        (
+                            f"development interface {identifier or index} needs one or "
+                            "more guard_profiles"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+            else:
+                known_profiles = [
+                    profile for profile in guard_profiles if profile in profile_ids
+                ]
+                for guard_profile in guard_profiles:
+                    if guard_profile not in profile_ids:
+                        findings.append(
+                            Finding(
+                                "error",
+                                "development-interface.unknown-profile",
+                                (
+                                    f"development interface {identifier or index} "
+                                    f"references unknown validation profile {guard_profile}"
+                                ),
+                                CONFIG_NAME,
+                            )
+                        )
+                if known_profiles:
+                    try:
+                        _, guard_commands = expand_validation_profiles(
+                            config,
+                            known_profiles,
+                        )
+                    except ValueError:
+                        guard_commands = []
+                    if not guard_commands:
+                        findings.append(
+                            Finding(
+                                "error",
+                                "development-interface.empty-proof",
+                                (
+                                    f"development interface {identifier or index} guard "
+                                    "profiles expand to no commands"
+                                ),
+                                CONFIG_NAME,
+                            )
+                        )
     metrics["development_interface_count"] = len(interface_ids)
 
     adapters = config.get("adapters", {})
@@ -885,22 +1159,59 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
                     CONFIG_NAME,
                 )
             )
+        elif guard:
+            try:
+                _, rule_commands = expand_validation_profiles(config, [str(guard)])
+            except ValueError:
+                rule_commands = []
+            if not rule_commands:
+                findings.append(
+                    Finding(
+                        "error",
+                        "rule.empty-guard",
+                        (
+                            f"rule {rule['id']} guard profile {guard} expands to no "
+                            "executable commands"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
 
     evidence = config.get("evidence", {})
-    if not isinstance(evidence, dict) or not isinstance(evidence.get("directory"), str):
+    if (
+        not isinstance(evidence, dict)
+        or not isinstance(evidence.get("directory"), str)
+        or not evidence.get("directory", "").strip()
+    ):
         findings.append(
             Finding(
                 "error",
                 "config.evidence",
-                "evidence.directory must be configured",
+                "evidence.directory must be configured as a non-empty relative path",
                 CONFIG_NAME,
             )
         )
     else:
         try:
-            project_path(root, evidence["directory"])
+            evidence_directory = project_path(root, evidence["directory"])
         except ValueError as exc:
             findings.append(Finding("error", "evidence.path", str(exc), CONFIG_NAME))
+        else:
+            git_directory = root / ".git"
+            if git_directory.exists():
+                probe = evidence_directory / ".project-agent-toolkit-ignore-probe"
+                if not git_ignores_path(root, probe):
+                    findings.append(
+                        Finding(
+                            "error",
+                            "evidence.not-ignored",
+                            (
+                                f"evidence directory {evidence['directory']} is not ignored "
+                                "by Git; receipts would mutate the validated working tree"
+                            ),
+                            ".gitignore",
+                        )
+                    )
 
     coverage = coverage_report(config)
     metrics["coverage"] = coverage
@@ -1128,26 +1439,68 @@ def expand_validation_profiles(config: dict[str, Any], selected: list[str]) -> t
 
 
 def git_state(root: Path) -> dict[str, Any]:
-    def capture(args: list[str]) -> str | None:
+    def capture(args: list[str]) -> bytes | None:
         result = subprocess.run(
             ["git", *args],
             cwd=root,
-            text=True,
             capture_output=True,
             check=False,
         )
-        return result.stdout.strip() if result.returncode == 0 else None
+        return result.stdout if result.returncode == 0 else None
 
-    revision = capture(["rev-parse", "HEAD"])
-    status = capture(["status", "--porcelain=v1"])
+    revision_bytes = capture(["rev-parse", "HEAD"])
+    revision = (
+        revision_bytes.decode("utf-8", errors="replace").strip()
+        if revision_bytes is not None
+        else None
+    )
+    status = capture(["status", "--porcelain=v1", "-z"])
+    if status is None:
+        return {
+            "revision": None,
+            "dirty": None,
+            "status_sha256": None,
+            "worktree_sha256": None,
+        }
+
+    if revision:
+        tracked_diff = capture(["diff", "--binary", "--no-ext-diff", "HEAD", "--"])
+    else:
+        staged = capture(["diff", "--binary", "--no-ext-diff", "--cached", "--"])
+        unstaged = capture(["diff", "--binary", "--no-ext-diff", "--"])
+        tracked_diff = (staged or b"") + (unstaged or b"")
+    untracked_raw = capture(["ls-files", "--others", "--exclude-standard", "-z"]) or b""
+
+    worktree_digest = hashlib.sha256()
+
+    def add_digest_chunk(label: bytes, data: bytes) -> None:
+        worktree_digest.update(struct.pack(">I", len(label)))
+        worktree_digest.update(label)
+        worktree_digest.update(struct.pack(">Q", len(data)))
+        worktree_digest.update(data)
+
+    add_digest_chunk(b"status", status)
+    add_digest_chunk(b"tracked-diff", tracked_diff or b"")
+    for raw_relative in sorted(part for part in untracked_raw.split(b"\0") if part):
+        relative = raw_relative.decode("utf-8", errors="surrogateescape")
+        try:
+            path = project_path(root, relative)
+        except ValueError:
+            continue
+        add_digest_chunk(b"untracked-path", raw_relative)
+        if path.is_file():
+            add_digest_chunk(
+                b"untracked-content",
+                bytes.fromhex(file_sha256(path)),
+            )
+        else:
+            add_digest_chunk(b"untracked-content", b"<not-a-file>")
+
     return {
         "revision": revision,
-        "dirty": bool(status) if status is not None else None,
-        "status_sha256": (
-            hashlib.sha256(status.encode("utf-8")).hexdigest()
-            if status is not None
-            else None
-        ),
+        "dirty": bool(status),
+        "status_sha256": hashlib.sha256(status).hexdigest(),
+        "worktree_sha256": worktree_digest.hexdigest(),
     }
 
 
@@ -1182,13 +1535,194 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def inspect_visual_artifact(path: Path) -> dict[str, Any]:
+    extension = path.suffix.lower()
+    with path.open("rb") as handle:
+        header = handle.read(1024 * 1024)
+        handle.seek(max(0, path.stat().st_size - 16))
+        tail = handle.read(16)
+
+    width: int | None = None
+    height: int | None = None
+    media_format: str | None = None
+
+    if extension == ".png":
+        if len(header) >= 24 and header[:8] == b"\x89PNG\r\n\x1a\n":
+            saw_ihdr = False
+            saw_idat = False
+            saw_iend = False
+            with path.open("rb") as handle:
+                handle.read(8)
+                while True:
+                    length_bytes = handle.read(4)
+                    if len(length_bytes) != 4:
+                        break
+                    length = int.from_bytes(length_bytes, "big")
+                    chunk_type = handle.read(4)
+                    chunk_data = handle.read(length)
+                    crc_bytes = handle.read(4)
+                    if (
+                        len(chunk_type) != 4
+                        or len(chunk_data) != length
+                        or len(crc_bytes) != 4
+                    ):
+                        break
+                    expected_crc = int.from_bytes(crc_bytes, "big")
+                    actual_crc = zlib.crc32(chunk_type)
+                    actual_crc = zlib.crc32(chunk_data, actual_crc) & 0xFFFFFFFF
+                    if actual_crc != expected_crc:
+                        break
+                    if chunk_type == b"IHDR" and not saw_ihdr and length == 13:
+                        width = int.from_bytes(chunk_data[:4], "big")
+                        height = int.from_bytes(chunk_data[4:8], "big")
+                        saw_ihdr = True
+                    elif chunk_type == b"IDAT":
+                        saw_idat = True
+                    elif chunk_type == b"IEND" and length == 0:
+                        saw_iend = True
+                        break
+            if saw_ihdr and saw_idat and saw_iend:
+                media_format = "png"
+    elif extension in {".jpg", ".jpeg"}:
+        if header[:2] == b"\xff\xd8":
+            cursor = 2
+            sof_markers = {
+                0xC0,
+                0xC1,
+                0xC2,
+                0xC3,
+                0xC5,
+                0xC6,
+                0xC7,
+                0xC9,
+                0xCA,
+                0xCB,
+                0xCD,
+                0xCE,
+                0xCF,
+            }
+            while cursor + 4 <= len(header):
+                if header[cursor] != 0xFF:
+                    cursor += 1
+                    continue
+                marker = header[cursor + 1]
+                cursor += 2
+                if marker in {0xD8, 0xD9} or 0xD0 <= marker <= 0xD7:
+                    continue
+                if cursor + 2 > len(header):
+                    break
+                segment_length = int.from_bytes(header[cursor : cursor + 2], "big")
+                if segment_length < 2 or cursor + segment_length > len(header):
+                    break
+                if marker in sof_markers and segment_length >= 7:
+                    height = int.from_bytes(header[cursor + 3 : cursor + 5], "big")
+                    width = int.from_bytes(header[cursor + 5 : cursor + 7], "big")
+                    if tail.endswith(b"\xff\xd9"):
+                        media_format = "jpeg"
+                    break
+                cursor += segment_length
+    elif extension == ".gif":
+        if len(header) >= 10 and header[:6] in {b"GIF87a", b"GIF89a"}:
+            width = int.from_bytes(header[6:8], "little")
+            height = int.from_bytes(header[8:10], "little")
+            if tail.endswith(b";"):
+                media_format = "gif"
+    elif extension == ".bmp":
+        if len(header) >= 26 and header[:2] == b"BM":
+            width = abs(int.from_bytes(header[18:22], "little", signed=True))
+            height = abs(int.from_bytes(header[22:26], "little", signed=True))
+            declared_size = int.from_bytes(header[2:6], "little")
+            if declared_size <= path.stat().st_size:
+                media_format = "bmp"
+    elif extension == ".webp":
+        if len(header) >= 30 and header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+            chunk = header[12:16]
+            if chunk == b"VP8X" and len(header) >= 30:
+                width = 1 + int.from_bytes(header[24:27], "little")
+                height = 1 + int.from_bytes(header[27:30], "little")
+            elif chunk == b"VP8 " and len(header) >= 30 and header[23:26] == b"\x9d\x01\x2a":
+                width = int.from_bytes(header[26:28], "little") & 0x3FFF
+                height = int.from_bytes(header[28:30], "little") & 0x3FFF
+            elif chunk == b"VP8L" and len(header) >= 25 and header[20] == 0x2F:
+                bits = int.from_bytes(header[21:25], "little")
+                width = (bits & 0x3FFF) + 1
+                height = ((bits >> 14) & 0x3FFF) + 1
+            declared_size = int.from_bytes(header[4:8], "little") + 8
+            if declared_size <= path.stat().st_size:
+                media_format = "webp"
+    elif extension == ".mp4":
+        file_size = path.stat().st_size
+        box_types: set[bytes] = set()
+        structurally_valid = True
+        with path.open("rb") as handle:
+            offset = 0
+            while offset + 8 <= file_size:
+                handle.seek(offset)
+                box_header = handle.read(16)
+                if len(box_header) < 8:
+                    structurally_valid = False
+                    break
+                box_size = int.from_bytes(box_header[:4], "big")
+                box_type = box_header[4:8]
+                header_size = 8
+                if box_size == 1:
+                    if len(box_header) < 16:
+                        structurally_valid = False
+                        break
+                    box_size = int.from_bytes(box_header[8:16], "big")
+                    header_size = 16
+                elif box_size == 0:
+                    box_size = file_size - offset
+                if box_size < header_size or offset + box_size > file_size:
+                    structurally_valid = False
+                    break
+                box_types.add(box_type)
+                offset += box_size
+            if offset != file_size:
+                structurally_valid = False
+        if (
+            structurally_valid
+            and {b"ftyp", b"moov", b"mdat"}.issubset(box_types)
+        ):
+            media_format = "mp4"
+    elif extension == ".webm":
+        required_elements = (
+            b"\x1a\x45\xdf\xa3",  # EBML
+            b"\x18\x53\x80\x67",  # Segment
+            b"\x16\x54\xae\x6b",  # Tracks
+            b"\x1f\x43\xb6\x75",  # Cluster
+        )
+        if all(element in header for element in required_elements):
+            media_format = "webm"
+
+    if media_format is None:
+        raise ValueError(
+            f"visual artifact is not a valid {extension.lstrip('.')} file: {path.name}"
+        )
+    if media_format not in {"mp4", "webm"} and (
+        not isinstance(width, int)
+        or not isinstance(height, int)
+        or width < 1
+        or height < 1
+    ):
+        raise ValueError(f"visual artifact has invalid dimensions: {path.name}")
+    return {
+        "format": media_format,
+        "width": width,
+        "height": height,
+    }
+
+
 def collect_visual_evidence(
     root: Path,
     config: dict[str, Any],
     routes: list[str],
+    changed_paths: list[str],
     artifacts: list[str],
     checks: list[str],
     verdict: str | None,
+    surface: str | None,
+    references: list[str],
 ) -> dict[str, Any] | None:
     policy = config.get("visual_validation")
     if not isinstance(policy, dict):
@@ -1199,7 +1733,14 @@ def collect_visual_evidence(
         if isinstance(route, str)
     ]
     required = bool(set(routes).intersection(configured_routes))
-    if not required and not artifacts and not checks and verdict is None:
+    if (
+        not required
+        and not artifacts
+        and not checks
+        and verdict is None
+        and not surface
+        and not references
+    ):
         return None
 
     minimum = policy.get("artifact_min_count", 1)
@@ -1210,7 +1751,38 @@ def collect_visual_evidence(
             f"visual verification requires at least {minimum} rendered artifact(s)"
         )
 
+    max_age_seconds = policy.get("artifact_max_age_seconds", 3600)
+    if (
+        not isinstance(max_age_seconds, int)
+        or isinstance(max_age_seconds, bool)
+        or max_age_seconds < 1
+    ):
+        max_age_seconds = 3600
+    minimum_checks = policy.get("min_review_checks", 1)
+    if (
+        not isinstance(minimum_checks, int)
+        or isinstance(minimum_checks, bool)
+        or minimum_checks < 1
+    ):
+        minimum_checks = 1
+    cleaned_surface = surface.strip() if isinstance(surface, str) else ""
+    if required and policy.get("require_surface", True) is True and not cleaned_surface:
+        raise ValueError(
+            "visual verification requires the real acceptance surface to be named"
+        )
+
+    source_mtimes = []
+    for relative in changed_paths:
+        try:
+            source = project_path(root, relative)
+        except ValueError:
+            continue
+        if source.is_file():
+            source_mtimes.append(source.stat().st_mtime)
+    source_mtime_floor = max(source_mtimes) if source_mtimes else None
+
     artifact_records: list[dict[str, Any]] = []
+    now = time.time()
     for relative in artifacts:
         try:
             path = project_path(root, relative)
@@ -1225,26 +1797,60 @@ def collect_visual_evidence(
             )
         if path.stat().st_size == 0:
             raise ValueError(f"visual artifact is empty: {relative}")
+        artifact_metadata = inspect_visual_artifact(path)
+        modified_at = path.stat().st_mtime
+        age_seconds = now - modified_at
+        if age_seconds > max_age_seconds:
+            raise ValueError(
+                f"visual artifact is stale ({round(age_seconds, 1)}s old): {relative}"
+            )
+        if age_seconds < -300:
+            raise ValueError(f"visual artifact timestamp is in the future: {relative}")
+        if source_mtime_floor is not None and modified_at + 1 < source_mtime_floor:
+            raise ValueError(
+                f"visual artifact predates a declared changed path: {relative}"
+            )
         artifact_records.append(
             {
                 "path": posix(path.relative_to(root)),
                 "size_bytes": path.stat().st_size,
                 "sha256": file_sha256(path),
+                "modified_at": datetime.fromtimestamp(
+                    modified_at,
+                    timezone.utc,
+                ).isoformat(),
+                **artifact_metadata,
             }
         )
 
     cleaned_checks = [check.strip() for check in checks if check.strip()]
+    invalid_checks = [
+        check
+        for check in cleaned_checks
+        if len(check) < 12 or check.lower() in VISUAL_GENERIC_CHECKS
+    ]
+    if invalid_checks:
+        raise ValueError(
+            "visual review checks must describe a concrete inspected property"
+        )
     require_review = policy.get("require_review", True) is True
-    if required and require_review:
+    review_supplied = bool(
+        required or artifacts or checks or verdict is not None or cleaned_surface
+    )
+    if review_supplied and require_review:
         if verdict != "pass":
             raise ValueError("visual verification requires an explicit pass verdict")
-        if not cleaned_checks:
-            raise ValueError("visual verification requires at least one concrete review check")
+        if len(cleaned_checks) < minimum_checks:
+            raise ValueError(
+                f"visual verification requires at least {minimum_checks} concrete review check(s)"
+            )
     if verdict == "fail":
         raise ValueError("visual review verdict is fail")
 
     return {
         "required": required,
+        "surface": cleaned_surface or None,
+        "references": [item.strip() for item in references if item.strip()],
         "artifacts": artifact_records,
         "checks": cleaned_checks,
         "verdict": verdict,
@@ -1262,20 +1868,48 @@ def verify(
     visual_artifacts: list[str] | None = None,
     visual_checks: list[str] | None = None,
     visual_verdict: str | None = None,
+    visual_surface: str | None = None,
+    visual_references: list[str] | None = None,
 ) -> tuple[int, dict[str, Any], Path | None]:
+    if not claim.strip():
+        raise ValueError("verification requires a non-empty claim")
     details = route_details(config, task, paths)
     visual_evidence = collect_visual_evidence(
         root,
         config,
         details["routes"],
+        paths,
         visual_artifacts or [],
         visual_checks or [],
         visual_verdict,
+        visual_surface,
+        visual_references or [],
     )
     selected = requested_profiles or details["validation_profiles"]
     profiles, commands = expand_validation_profiles(config, selected)
     if not commands:
         raise ValueError("selected validation profiles contain no commands")
+    config_bytes_before = (root / CONFIG_NAME).read_bytes()
+    vcs_before = git_state(root)
+    if create_receipt and vcs_before["dirty"] is not None:
+        evidence = config.get("evidence", {})
+        relative_dir = (
+            str(evidence.get("directory", ".agent-evidence"))
+            if isinstance(evidence, dict)
+            else ".agent-evidence"
+        )
+        normalized_evidence_dir = relative_dir.rstrip("/\\")
+        if not normalized_evidence_dir:
+            raise ValueError("evidence.directory must be a non-empty relative path")
+        evidence_probe = project_path(
+            root,
+            f"{normalized_evidence_dir}/.project-agent-toolkit-ignore-probe",
+        )
+        if not git_ignores_path(root, evidence_probe):
+            raise ValueError(
+                f"evidence directory {relative_dir} must be ignored by Git "
+                "before a receipt can be written"
+            )
     results: list[dict[str, Any]] = []
     for command, proves in commands:
         print(f"> {command}", flush=True)
@@ -1303,22 +1937,40 @@ def verify(
                 "stderr_sha256": hashlib.sha256(result.stderr.encode("utf-8")).hexdigest(),
             }
         )
-    vcs = git_state(root)
-    config_bytes = (root / CONFIG_NAME).read_bytes()
+    vcs_after = git_state(root)
+    config_bytes_after = (root / CONFIG_NAME).read_bytes()
+    artifacts_stable = True
+    if visual_evidence is not None:
+        for artifact in visual_evidence["artifacts"]:
+            artifact_path = project_path(root, str(artifact["path"]))
+            if (
+                not artifact_path.is_file()
+                or file_sha256(artifact_path) != artifact["sha256"]
+            ):
+                artifacts_stable = False
+                break
+    state_stable = (
+        vcs_before == vcs_after
+        and config_bytes_before == config_bytes_after
+        and artifacts_stable
+    )
+    commands_passed = all(item["exit_code"] == 0 for item in results)
     payload = {
-        "schema": "project-agent-toolkit.evidence.v1",
+        "schema": "project-agent-toolkit.evidence.v2",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "project_root": str(root),
-        "governance_sha256": hashlib.sha256(config_bytes).hexdigest(),
-        "vcs": vcs,
+        "governance_sha256": hashlib.sha256(config_bytes_before).hexdigest(),
+        "vcs": vcs_before,
+        "vcs_after": vcs_after,
+        "state_stable": state_stable,
         "task": task,
         "paths": paths,
-        "claim": claim,
+        "claim": claim.strip(),
         "routes": details["routes"],
         "documents": details["documents"],
         "profiles": profiles,
         "results": results,
-        "passed": all(item["exit_code"] == 0 for item in results),
+        "passed": commands_passed and state_stable,
     }
     if visual_evidence is not None:
         payload["visual_evidence"] = visual_evidence
@@ -1420,12 +2072,19 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         for rule in config.get("rules", [])
         if isinstance(rule, dict) and rule.get("guard")
     )
-    referenced_profiles.update(
-        str(profile)
-        for interface in config.get("development_interfaces", [])
-        if isinstance(interface, dict)
-        for profile in interface.get("guard_profiles", [])
-    )
+    for interface in config.get("development_interfaces", []):
+        if not isinstance(interface, dict):
+            continue
+        interface_guards = interface.get("guard_profiles", [])
+        if isinstance(interface_guards, dict):
+            referenced_profiles.update(
+                str(profile)
+                for selected in interface_guards.values()
+                if isinstance(selected, list)
+                for profile in selected
+            )
+        elif isinstance(interface_guards, list):
+            referenced_profiles.update(str(profile) for profile in interface_guards)
     unguarded_rules = [
         str(rule.get("id", "<unnamed>"))
         for rule in config.get("rules", [])
@@ -1450,11 +2109,122 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
     return gaps
 
 
+def add_visual_governance_defaults(config: dict[str, Any]) -> None:
+    routes = config.setdefault("routes", [])
+    if not isinstance(routes, list):
+        return
+    route_ids = {
+        str(route.get("id"))
+        for route in routes
+        if isinstance(route, dict) and route.get("id")
+    }
+    validation = config.setdefault("validation", {})
+    if not isinstance(validation, dict):
+        return
+    profiles = validation.setdefault("profiles", {})
+    if not isinstance(profiles, dict):
+        return
+    default_profiles = [
+        str(profile)
+        for profile in validation.get("default_profiles", [])
+        if isinstance(profile, str)
+    ]
+    profiles.setdefault(
+        "visual",
+        {
+            "extends": default_profiles,
+            "commands": [],
+        },
+    )
+
+    if "visual" not in route_ids:
+        authority_ids = {
+            str(authority.get("id"))
+            for authority in config.get("authorities", [])
+            if isinstance(authority, dict) and authority.get("id")
+        }
+        read = [
+            authority
+            for authority in ("architecture", "rules", "workflow", "state")
+            if authority in authority_ids
+        ]
+        visual_route = {
+            "id": "visual",
+            "terms": [
+                "ui",
+                "visual",
+                "render",
+                "drawing",
+                "modeling",
+                "3d model",
+                "character model",
+                "mesh",
+                "animation",
+                "vfx",
+                "layout",
+                "scene",
+                "map",
+                "terrain",
+                "css",
+                "style",
+                "font",
+                "icon",
+                "responsive",
+                "material",
+                "texture",
+                "shader",
+                "lighting",
+                "camera",
+                "art",
+            ],
+            "paths": [],
+            "read": read,
+            "validation": ["visual"],
+        }
+        default_index = next(
+            (
+                index
+                for index, route in enumerate(routes)
+                if isinstance(route, dict) and route.get("id") == "default"
+            ),
+            len(routes),
+        )
+        routes.insert(default_index, visual_route)
+
+    policy = config.setdefault("visual_validation", {})
+    if isinstance(policy, dict):
+        selected_routes = policy.setdefault("routes", ["visual"])
+        if isinstance(selected_routes, list) and "visual" not in selected_routes:
+            selected_routes.append("visual")
+        policy.setdefault("artifact_min_count", 1)
+        policy.setdefault("min_review_checks", 1)
+        policy.setdefault("artifact_max_age_seconds", 3600)
+        policy["require_review"] = True
+        policy["require_surface"] = True
+
+    route_tests = config.setdefault("route_tests", [])
+    if isinstance(route_tests, list) and not any(
+        isinstance(test, dict) and test.get("id") == "visual-route"
+        for test in route_tests
+    ):
+        actual = route_details(config, "inspect UI layout", [])
+        route_tests.append(
+            {
+                "id": "visual-route",
+                "task": "inspect UI layout",
+                "paths": [],
+                "expect_routes": actual["routes"],
+                "expect_documents": actual["documents"],
+                "expect_validation_profiles": actual["validation_profiles"],
+            }
+        )
+
+
 def migrate_config(config: dict[str, Any]) -> dict[str, Any]:
     version = config.get("version")
     if version == CURRENT_VERSION:
         return config
-    if version not in {1, 2}:
+    if version not in {1, 2, 3}:
         raise ValueError(f"cannot migrate configuration version {version!r}")
     migrated = json.loads(json.dumps(config))
     if version == 1:
@@ -1515,8 +2285,27 @@ def migrate_config(config: dict[str, Any]) -> dict[str, Any]:
         migrated.setdefault("rules", [])
         migrated.setdefault("evidence", {"directory": ".agent-evidence"})
 
-    migrated["version"] = CURRENT_VERSION
     migrated.setdefault("development_interfaces", [])
+    for interface in migrated.get("development_interfaces", []):
+        if (
+            isinstance(interface, dict)
+            and str(interface.get("protocol", "")).lower() == "mcp"
+            and isinstance(interface.get("guard_profiles"), list)
+        ):
+            legacy_profiles = [
+                str(profile)
+                for profile in interface["guard_profiles"]
+                if isinstance(profile, str) and profile
+            ]
+            required = list(MCP_GUARD_KINDS)
+            if interface.get("production_allowed") is False:
+                required.append("release")
+            interface["guard_profiles"] = {
+                guard_kind: list(legacy_profiles)
+                for guard_kind in required
+            }
+    add_visual_governance_defaults(migrated)
+    migrated["version"] = CURRENT_VERSION
     return migrated
 
 
@@ -1584,6 +2373,8 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("--visual-artifact", action="append", default=[])
     verify_parser.add_argument("--visual-check", action="append", default=[])
     verify_parser.add_argument("--visual-verdict", choices=("pass", "fail"))
+    verify_parser.add_argument("--visual-surface")
+    verify_parser.add_argument("--visual-reference", action="append", default=[])
     verify_parser.add_argument("--json", action="store_true")
 
     coverage_parser = subparsers.add_parser("coverage", help="report governance coverage gaps")
@@ -1670,6 +2461,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.visual_artifact,
                 args.visual_check,
                 args.visual_verdict,
+                args.visual_surface,
+                args.visual_reference,
             )
         except ValueError as exc:
             print(f"verify: {exc}", file=sys.stderr)
@@ -1714,6 +2507,8 @@ def main(argv: list[str] | None = None) -> int:
             temporary.write_text(json.dumps(migrated, indent=2) + "\n", encoding="utf-8")
             temporary.replace(target)
             print(f"Upgraded {CONFIG_NAME} to version {CURRENT_VERSION}")
+            if ensure_evidence_ignore(root):
+                print("Updated .gitignore additively for transient evidence")
         elif not changed:
             print(f"upgrade: already at version {CURRENT_VERSION}")
         return 0

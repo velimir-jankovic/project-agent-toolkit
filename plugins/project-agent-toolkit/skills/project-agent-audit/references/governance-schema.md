@@ -1,7 +1,7 @@
 # Governance configuration
 
 `.agent-governance.json` is project data consumed by the toolkit. Schema
-version `3` is current.
+version `4` is current.
 
 ## Top level
 
@@ -20,7 +20,9 @@ version `3` is current.
 - `limits`: context and duplication budgets.
 - `tooling`: configuration roots and files allowed inside them.
 - `validation`: named, composable validation profiles.
-- `evidence.directory`: ignored directory for revision-bound receipts.
+- `evidence.directory`: Git-ignored directory for revision-bound receipts.
+  Audit and receipt creation reject a non-ignored directory inside a Git
+  worktree because writing the receipt would mutate the validated state.
 
 ## Authority
 
@@ -131,11 +133,13 @@ guard; it cannot infer unregistered prose rules semantically.
 
 ## Evidence
 
-`verify` writes `project-agent-toolkit.evidence.v1` receipts. They include the
-governance-file digest, UTC timestamp, version-control revision and dirty-state
-digest when Git is available, routing result, selected profiles, claims,
-commands, proof statements, exit codes, durations, and stdout/stderr hashes.
-Command output itself is not persisted.
+`verify` writes `project-agent-toolkit.evidence.v2` receipts. They include the
+governance-file digest, UTC timestamp, version-control revision, tracked diff
+and untracked-content digest when Git is available, routing result, selected
+profiles, claims, commands, proof statements, exit codes, durations, and
+stdout/stderr hashes. Pre/post state is compared and a guard that mutates the
+tested source or visual artifacts cannot pass. Command output itself is not
+persisted.
 
 ## Development interface
 
@@ -146,15 +150,23 @@ Command output itself is not persisted.
   "activation_flag": "--enable-editor-mcp",
   "default_enabled": false,
   "production_allowed": false,
-  "guard_profiles": ["focused", "release"]
+  "guard_profiles": {
+    "disabled": ["mcp-disabled"],
+    "enabled": ["mcp-enabled"],
+    "parity": ["mcp-parity"],
+    "lifecycle": ["mcp-lifecycle"],
+    "performance": ["mcp-performance"],
+    "release": ["mcp-release"]
+  }
 }
 ```
 
 The activation flag is the single switch that starts the surface.
-`default_enabled` must be false. `guard_profiles` name project-owned checks
-that prove enabled behavior, disabled behavior, and—when
-`production_allowed` is false—release exclusion. The toolkit validates the
-declaration; those project checks validate the executable.
+`default_enabled` must be false. Every required `guard_profiles` category must
+name profiles that expand to executable commands. `release` is mandatory when
+`production_allowed` is false, and each category needs a matching command
+`proves` statement. The toolkit validates the declaration; those project checks
+validate the executable.
 
 ## Visual validation
 
@@ -163,15 +175,20 @@ declaration; those project checks validate the executable.
   "visual_validation": {
     "routes": ["visual"],
     "artifact_min_count": 1,
-    "require_review": true
+    "min_review_checks": 1,
+    "artifact_max_age_seconds": 3600,
+    "require_review": true,
+    "require_surface": true
   }
 }
 ```
 
 When any configured route matches, `verify` refuses to run without the minimum
-number of project-relative rendered image/video artifacts, a `pass` verdict,
-and at least one concrete `--visual-check`. Artifact paths, sizes, and hashes
-are stored in the revision-bound evidence receipt.
+number of project-relative, structurally valid, recent image/video artifacts,
+a named actual acceptance surface, a `pass` verdict, and the configured number
+of concrete `--visual-check` values. Artifact paths, formats, dimensions when
+available, timestamps, sizes, and hashes are stored in the content-bound
+evidence receipt.
 
 ## Limits and tooling
 

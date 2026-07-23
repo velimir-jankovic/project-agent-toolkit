@@ -12,7 +12,7 @@ codex plugin marketplace add velimir-jankovic/project-agent-toolkit
 codex plugin add project-agent-toolkit@project-agent-toolkit
 ```
 
-Start a new Codex task after installation so the four skills are loaded.
+Start a new Codex task after installation so all six skills are loaded.
 
 It separates two things that often become tangled:
 
@@ -55,7 +55,13 @@ python plugins/project-agent-toolkit/scripts/governance.py upgrade --root C:\pat
 
 `init` is additive by default and never overwrites an existing file. Use
 `--profile full` to include generic role and prompt templates. Use `--force`
-only after reviewing the diff.
+only after reviewing the diff. Bootstrap also adds `.agent-evidence/` to
+`.gitignore` without removing existing ignore rules. Before `verify` can pass,
+configure at least one real project-owned command in a routed validation
+profile; `audit` reports empty routed profiles explicitly.
+Receipt creation is rejected in a Git worktree when the configured evidence
+directory is not ignored, so recording evidence cannot invalidate the source
+state it claims to verify.
 
 `generate` keeps platform-facing agent adapters synchronized with one canonical
 configuration. It checks by default; `--write` updates only managed files, and
@@ -70,8 +76,14 @@ For configured visual routes, it additionally requires one or more rendered
 artifacts plus an explicit review:
 
 ```console
-python plugins/project-agent-toolkit/scripts/governance.py verify --root C:\path\to\project --task "fix UI layout" --visual-artifact artifacts/ui.png --visual-check "No clipping at the target viewport" --visual-verdict pass
+python plugins/project-agent-toolkit/scripts/governance.py verify --root C:\path\to\project --task "fix UI layout" --visual-artifact artifacts/ui.png --visual-surface "Actual application window at 1280x720" --visual-check "No clipping at the target viewport" --visual-verdict pass
 ```
+
+Visual artifacts must be structurally valid, recent image/video containers.
+Receipts record format, dimensions when available, timestamps, hashes,
+acceptance-surface metadata, references, and concrete checks. The reviewer
+still owns aesthetic judgment; the guard prevents missing, malformed, stale,
+or anonymous evidence from being presented as verified.
 
 Validation commands are trusted repository configuration and run through the
 host platform shell. Review changes to `.agent-governance.json` with the same
@@ -119,8 +131,12 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - Generated adapters have one source of truth.
 - Route behavior is contract-tested with representative tasks.
 - Validation claims are revision-bound evidence, not remembered terminal output.
+- Dirty-tree receipts hash tracked diffs and untracked file contents, and fail
+  when validation mutates the tested source state.
 - MCP development surfaces are optional adapters, not runtime authority, and
-  remain off unless their one declared activation flag is present.
+  remain off unless their one declared activation flag is present. MCP
+  declarations require executable disabled, enabled, parity, lifecycle,
+  performance, and—when production activation is forbidden—release proofs.
 - Visual changes require current render evidence and a concrete visual verdict;
   compilation and unit tests alone are insufficient.
 - "Done" means the requested outcome exists and current evidence supports it.

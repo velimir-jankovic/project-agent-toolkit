@@ -18,5 +18,7 @@ current Codex plugin and skill validators when available.
 
 ## Release
 
-Update semantic version, rerun quality and ingestion validation, push the
-marketplace, then reinstall the plugin so Codex invalidates its cached version.
+Update semantic version, use the plugin-creator cachebuster helper, rerun
+quality and ingestion validation, push the marketplace, then reinstall the
+plugin so Codex invalidates its cached version. Exercise the installed cache
+against a clean scratch project before calling the release complete.

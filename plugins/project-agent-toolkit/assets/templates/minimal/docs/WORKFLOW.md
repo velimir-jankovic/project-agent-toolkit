@@ -18,7 +18,9 @@
 
 Run checks in increasing cost order: focused static checks, focused tests,
 integration checks, then broader gates when risk warrants them. A check that
-was not run is not evidence.
+was not run is not evidence. Configure at least one project-owned command in a
+routed validation profile before using `verify`; bootstrap profiles are empty
+by design.
 
 ## Handoff
 

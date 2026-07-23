@@ -58,3 +58,22 @@
 5. Release test: when production is forbidden, prove a release artifact cannot
    activate the surface.
 6. Performance test: disabled mode has no material steady-state cost.
+
+Declare those proofs explicitly:
+
+```json
+{
+  "guard_profiles": {
+    "disabled": ["mcp-disabled"],
+    "enabled": ["mcp-enabled"],
+    "parity": ["mcp-parity"],
+    "lifecycle": ["mcp-lifecycle"],
+    "performance": ["mcp-performance"],
+    "release": ["mcp-release"]
+  }
+}
+```
+
+`release` is required when `production_allowed` is false. Every referenced
+profile must expand to at least one executable project-owned command, and at
+least one command's `proves` statement must explicitly name its proof category.

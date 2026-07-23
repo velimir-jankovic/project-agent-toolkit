@@ -36,6 +36,8 @@ looks correct.
      --path <changed path> \
      --claim "<visual acceptance claim>" \
      --visual-artifact <project-relative screenshot-or-video> \
+     --visual-surface "<actual application/editor/runtime and viewport>" \
+     --visual-reference "<concept, mockup, or accepted baseline>" \
      --visual-check "<specific check performed>" \
      --visual-verdict pass
    ```
@@ -47,7 +49,9 @@ looks correct.
 
 - Visual routes cannot complete with compile/tests alone.
 - Evidence must come from the actual changed surface.
-- Artifacts must be project-relative image or video files.
+- Artifacts must be project-relative, structurally valid, recent image or video
+  files and must not predate declared changed paths.
+- Name the actual acceptance surface; a filename alone is not provenance.
 - `pass` requires at least one concrete review check.
 - When several views or states materially differ, capture all of them.
 - Compare against references explicitly; do not rely on memory.

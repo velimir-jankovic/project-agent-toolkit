@@ -42,7 +42,9 @@ of copying that policy into every agent entrypoint.
 8. Keep generated `AGENTS.md` and `.github/copilot-instructions.md` as concise
    indexes. Move durable rules to one canonical project-owned document.
 9. Configure validation profiles with `{ "run": ..., "proves": ... }` command
-   objects and route each task class to the appropriate profile.
+   objects and route each task class to the appropriate profile. Bootstrap
+   profiles are intentionally empty and verification cannot pass until real
+   project-owned commands are configured.
 10. Run:
 
    ```console

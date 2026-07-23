@@ -14,7 +14,9 @@ alternate source of truth.
 2. Identify the public API that owns the capability. Add or improve that API
    before exposing private UI or runtime internals through MCP.
 3. Register the surface in `.agent-governance.json` under
-   `development_interfaces`.
+   `development_interfaces`. Map each required proof category to one or more
+   non-empty project validation profiles; profile names without executable
+   checks are rejected.
 4. Use exactly one explicit activation flag. The disabled path is the default
    and must start no server, listener, worker, polling loop, or tool registry.
 5. Keep transport local by default: stdio or loopback. Remote exposure requires
@@ -49,11 +51,19 @@ Declare the exact switch rather than relying on convention:
       "activation_flag": "--enable-editor-mcp",
       "default_enabled": false,
       "production_allowed": false,
-      "guard_profiles": ["focused", "release"]
+      "guard_profiles": {
+        "disabled": ["mcp-disabled"],
+        "enabled": ["mcp-enabled"],
+        "parity": ["mcp-parity"],
+        "lifecycle": ["mcp-lifecycle"],
+        "performance": ["mcp-performance"],
+        "release": ["mcp-release"]
+      }
     }
   ]
 }
 ```
 
-The toolkit validates this contract. Project-owned guards prove the runtime
-actually honors it.
+The toolkit requires executable guards for every category. `release` is
+required when production activation is forbidden. Project-owned guards prove
+the runtime actually honors the declaration.
