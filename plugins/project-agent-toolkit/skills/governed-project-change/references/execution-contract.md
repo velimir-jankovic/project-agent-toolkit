@@ -27,3 +27,8 @@ Use the lowest sufficient rung, then move upward with risk:
 6. human visual or experiential acceptance.
 
 Higher rungs do not excuse missing focused regression coverage.
+
+For configured visual routes, compile and test commands are incomplete
+evidence. The verification receipt must also contain current rendered
+artifacts, their hashes, concrete inspection checks, and a passing visual
+verdict.

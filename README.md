@@ -34,6 +34,9 @@ layout. Projects describe their own policy in `.agent-governance.json`.
 - `mcp-driven-development` defines an optional semantic MCP control surface
   over project-owned public APIs, enabled by one explicit flag and disabled by
   default.
+- `visual-change-verification` requires fresh rendered artifacts and an
+  explicit review for UI, drawing, modeling, animation, VFX, scene, map, and
+  other appearance-dependent work.
 - `project-agent-handoff` creates compact, honest resume checkpoints.
 
 ## CLI
@@ -62,6 +65,13 @@ configuration. It checks by default; `--write` updates only managed files, and
 policy, runs project-owned commands, and writes a receipt containing the
 configuration digest, version-control revision and dirty state, commands,
 results, durations, proof statements, and output hashes.
+
+For configured visual routes, it additionally requires one or more rendered
+artifacts plus an explicit review:
+
+```console
+python plugins/project-agent-toolkit/scripts/governance.py verify --root C:\path\to\project --task "fix UI layout" --visual-artifact artifacts/ui.png --visual-check "No clipping at the target viewport" --visual-verdict pass
+```
 
 Validation commands are trusted repository configuration and run through the
 host platform shell. Review changes to `.agent-governance.json` with the same
@@ -111,6 +121,8 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - Validation claims are revision-bound evidence, not remembered terminal output.
 - MCP development surfaces are optional adapters, not runtime authority, and
   remain off unless their one declared activation flag is present.
+- Visual changes require current render evidence and a concrete visual verdict;
+  compilation and unit tests alone are insufficient.
 - "Done" means the requested outcome exists and current evidence supports it.
 - Handoffs preserve decisions and next actions, not chat transcripts.
 

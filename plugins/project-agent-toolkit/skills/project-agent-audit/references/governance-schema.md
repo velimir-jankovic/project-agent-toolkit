@@ -15,6 +15,8 @@ version `3` is current.
 - `rules`: registered durable rules and their guards.
 - `development_interfaces`: optional development-only control surfaces,
   including MCP activation and production policy.
+- `visual_validation`: routes that require rendered artifact and review
+  evidence.
 - `limits`: context and duplication budgets.
 - `tooling`: configuration roots and files allowed inside them.
 - `validation`: named, composable validation profiles.
@@ -46,7 +48,7 @@ important without being needed for every task.
 }
 ```
 
-Terms are case-insensitive substrings of the task. Paths are
+Terms are case-insensitive whole words or phrases in the task. Paths are
 repository-relative globs. All matching non-default routes are combined. When
 none match, the route named `default` is used.
 
@@ -153,6 +155,23 @@ The activation flag is the single switch that starts the surface.
 that prove enabled behavior, disabled behavior, and—when
 `production_allowed` is false—release exclusion. The toolkit validates the
 declaration; those project checks validate the executable.
+
+## Visual validation
+
+```json
+{
+  "visual_validation": {
+    "routes": ["visual"],
+    "artifact_min_count": 1,
+    "require_review": true
+  }
+}
+```
+
+When any configured route matches, `verify` refuses to run without the minimum
+number of project-relative rendered image/video artifacts, a `pass` verdict,
+and at least one concrete `--visual-check`. Artifact paths, sizes, and hashes
+are stored in the revision-bound evidence receipt.
 
 ## Limits and tooling
 

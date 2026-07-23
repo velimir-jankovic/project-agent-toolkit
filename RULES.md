@@ -14,3 +14,5 @@
 - MCP development surfaces are thin adapters over public project APIs, use one
   explicit activation flag, default to disabled, and require a release guard
   when production activation is forbidden.
+- Visual work is complete only after the actual acceptance surface is rendered,
+  inspected against specific checks, and recorded as revision-bound evidence.

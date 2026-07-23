@@ -66,6 +66,11 @@ class GovernanceTests(unittest.TestCase):
             self.assertEqual(routes, ["default"])
             self.assertEqual(documents, ["RULES.md", "docs/WORKFLOW.md"])
 
+            config = json.loads(root.joinpath(".agent-governance.json").read_text(encoding="utf-8"))
+            details = governance.route_details(config, "build service", [])
+            self.assertIn("implementation", details["routes"])
+            self.assertNotIn("visual", details["routes"])
+
     def test_tooling_pollution_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -181,6 +186,71 @@ class GovernanceTests(unittest.TestCase):
             self.assertIn("development-interface.activation-flag", codes)
             self.assertIn("development-interface.default-enabled", codes)
             self.assertIn("development-interface.unknown-profile", codes)
+
+    def test_visual_route_requires_rendered_and_reviewed_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "minimal", False)
+            config_path = root / ".agent-governance.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            executable = str(Path(sys.executable))
+            config["validation"]["profiles"]["fast"]["commands"] = [
+                {
+                    "run": f'"{executable}" -c "print(123)"',
+                    "proves": "The configured command executes",
+                }
+            ]
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "rendered artifact"):
+                governance.verify(
+                    root,
+                    config,
+                    "inspect UI layout",
+                    [],
+                    "UI is readable",
+                    [],
+                    False,
+                )
+
+            artifact = root / "artifacts" / "ui.png"
+            artifact.parent.mkdir()
+            artifact.write_bytes(b"\x89PNG\r\n\x1a\nrendered-test")
+            status, payload, receipt = governance.verify(
+                root,
+                config,
+                "inspect UI layout",
+                [],
+                "UI is readable",
+                [],
+                True,
+                ["artifacts/ui.png"],
+                ["No clipping at the target viewport"],
+                "pass",
+            )
+
+            self.assertEqual(status, 0)
+            self.assertIsNotNone(receipt)
+            self.assertEqual(payload["visual_evidence"]["verdict"], "pass")
+            self.assertEqual(
+                payload["visual_evidence"]["artifacts"][0]["path"],
+                "artifacts/ui.png",
+            )
+
+    def test_visual_policy_cannot_disable_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "minimal", False)
+            config_path = root / ".agent-governance.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["visual_validation"]["require_review"] = False
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+            findings, _ = governance.audit(root)
+            self.assertIn(
+                "visual-validation.review",
+                {finding.code for finding in findings},
+            )
 
     def test_invalid_adapter_shape_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

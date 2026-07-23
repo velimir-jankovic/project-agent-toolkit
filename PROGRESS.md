@@ -15,6 +15,8 @@ Deliver the first reusable, project-neutral Project Agent Toolkit release.
   evidence receipts, versioned migrations, and coverage reporting implemented.
 - Optional MCP-driven development contract and production-off activation model
   implemented.
+- Visual-change routing now requires rendered artifacts and explicit review
+  evidence.
 
 ## Open risks
 

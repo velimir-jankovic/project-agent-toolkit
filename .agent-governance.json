@@ -95,6 +95,35 @@
       ]
     },
     {
+      "id": "visual",
+      "terms": [
+        "ui",
+        "visual",
+        "render",
+        "drawing",
+        "modeling",
+        "3d model",
+        "character model",
+        "mesh",
+        "animation",
+        "vfx",
+        "layout",
+        "scene",
+        "map",
+        "terrain"
+      ],
+      "paths": [],
+      "read": [
+        "architecture",
+        "rules",
+        "workflow",
+        "state"
+      ],
+      "validation": [
+        "visual"
+      ]
+    },
+    {
       "id": "default",
       "terms": [],
       "paths": [
@@ -147,6 +176,23 @@
       ]
     },
     {
+      "id": "visual-route",
+      "task": "inspect UI layout",
+      "paths": [],
+      "expect_routes": [
+        "visual"
+      ],
+      "expect_documents": [
+        "RULES.md",
+        "docs/WORKFLOW.md",
+        "docs/ARCHITECTURE.md",
+        "PROGRESS.md"
+      ],
+      "expect_validation_profiles": [
+        "visual"
+      ]
+    },
+    {
       "id": "default-route",
       "task": "summarize current policy",
       "paths": [],
@@ -186,9 +232,22 @@
       "authority": "rules",
       "source": "RULES.md#project-agent-toolkit-rules",
       "guard": "release"
+    },
+    {
+      "id": "visual-evidence-required",
+      "authority": "rules",
+      "source": "RULES.md#project-agent-toolkit-rules",
+      "guard": "visual"
     }
   ],
   "development_interfaces": [],
+  "visual_validation": {
+    "routes": [
+      "visual"
+    ],
+    "artifact_min_count": 1,
+    "require_review": true
+  },
   "limits": {
     "entrypoint_max_lines": 120,
     "always_loaded_max_chars": 30000,
@@ -228,6 +287,12 @@
         ]
       },
       "release": {
+        "extends": [
+          "focused"
+        ],
+        "commands": []
+      },
+      "visual": {
         "extends": [
           "focused"
         ],

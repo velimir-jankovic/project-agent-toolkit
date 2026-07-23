@@ -43,6 +43,9 @@ for understanding the code.
 
    Prefer a focused regression proof before a broad gate. Never substitute a
    mock for the requested real workflow.
+   When a configured visual route matches, use
+   `$visual-change-verification`; the verification command requires rendered
+   artifacts and an explicit review.
 8. Update canonical state only when the durable objective, decision, or next
    action changed.
 9. Before claiming completion, use

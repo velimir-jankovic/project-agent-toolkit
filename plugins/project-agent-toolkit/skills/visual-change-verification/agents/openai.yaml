@@ -1,0 +1,6 @@
+interface:
+  display_name: "Visual Change Verification"
+  short_description: "Require rendered evidence for visual work"
+  default_prompt: "Use $visual-change-verification to render, inspect, and verify this visual change."
+policy:
+  allow_implicit_invocation: true
