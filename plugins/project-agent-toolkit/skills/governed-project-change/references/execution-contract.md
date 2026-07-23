@@ -5,7 +5,9 @@ Before claiming a change complete, answer:
 1. Does the requested behavior exist on the current revision?
 2. Is the capability owned by the correct component?
 3. Were unrelated user changes preserved?
-4. Is there a focused regression proof for the failure or contract changed?
+4. What plausible failure or observable contract needed proof? Did an existing
+   check already cover it, or can the new proof fail independently of the
+   implementation being tested?
 5. Which commands ran, and what did each prove?
 6. Which current evidence receipt records the revision, dirty state, and
    results?
@@ -26,7 +28,11 @@ Use the lowest sufficient rung, then move upward with risk:
 5. broad project gate;
 6. human visual or experiential acceptance.
 
-Higher rungs do not excuse missing focused regression coverage.
+Use only the rungs the risk requires. A new test needs a failure hypothesis and
+an independent observable outcome; code that merely repeats the implementation
+assumption is confirmation, not evidence. Prefer extending an existing focused
+or table-driven test and remove superseded coverage. Test count and coverage
+percentage are not outcomes.
 
 Evidence v2 hashes the tracked diff and untracked file contents. Validation
 must leave the tested project and supplied visual artifacts unchanged; a

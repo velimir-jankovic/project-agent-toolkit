@@ -128,6 +128,9 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - Task routes use progressive disclosure.
 - Model selection is environment policy, not repository architecture.
 - Validation commands are project data.
+- Validation starts from a plausible failure and uses the least expensive check
+  that can falsify it; test count and coverage percentage are not goals.
+- Simplicity and maintenance cost are part of correctness.
 - Generated adapters have one source of truth.
 - Route behavior is contract-tested with representative tasks.
 - Validation claims are revision-bound evidence, not remembered terminal output.
@@ -140,6 +143,8 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - Visual changes require current render evidence and a concrete visual verdict;
   compilation and unit tests alone are insufficient.
 - "Done" means the requested outcome exists and current evidence supports it.
+- Agent communication is concise and outcome-first, not a transcript of routine
+  work or a dump of validation logs.
 - Handoffs preserve decisions and next actions, not chat transcripts.
 
 See [governance-schema.md](plugins/project-agent-toolkit/skills/project-agent-audit/references/governance-schema.md)

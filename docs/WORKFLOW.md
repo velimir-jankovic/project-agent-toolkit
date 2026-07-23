@@ -8,13 +8,25 @@
    projects.
 4. Change `plugins/project-agent-toolkit/scripts/governance.py` when
    enforcement or routing semantics change.
-5. Add a focused unit test for CLI behavior and a structural guard for invariant
-   changes.
+5. Before adding a test, name the plausible failure and observable contract it
+   would protect. Prefer an existing check or extend one focused, table-driven
+   test. Add no test when a compiler, static check, guard, or existing test
+   already proves the claim.
 
 ## Verify
 
-Run `python scripts/quality.py`. For plugin ingestion changes, also run the
-current Codex plugin and skill validators when available.
+Use the least expensive evidence capable of disproving the claim. For a bug
+fix, demonstrate the regression against pre-fix behavior when practical; if
+that is impractical, record why. Run `python scripts/quality.py` as this
+repository's release gate. For plugin ingestion changes, also run the current
+Codex plugin and skill validators when available. Test count and coverage
+percentage are not completion criteria.
+
+## Communicate
+
+Lead with the outcome. During work, report only a changed decision, meaningful
+result, blocker, or risk. In the final response, summarize the change, evidence,
+and anything still unresolved without dumping logs or narrating every step.
 
 ## Release
 

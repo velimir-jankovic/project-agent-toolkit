@@ -10,6 +10,13 @@
 - Always-loaded context stays within `.agent-governance.json` limits.
 - Every configuration path and route is validated mechanically.
 - Changes pass `python scripts/quality.py` before completion is claimed.
+- Simplicity, cognitive load, and maintenance cost are acceptance criteria.
+  Prefer existing mechanisms and remove duplication over adding speculative
+  abstractions.
+- Add or change a test only when it can falsify a named plausible failure or
+  protect an observable contract not already proved by a cheaper check. Do not
+  mirror implementation, assert trivial details, duplicate coverage, or treat
+  test count and coverage percentage as outcomes.
 - A check that did not run is not reported as evidence.
 - Evidence receipts identify dirty source contents, not only dirty filenames,
   and validation that mutates the tested source state cannot pass.
@@ -20,3 +27,6 @@
 - Visual work is complete only after the actual acceptance surface is rendered,
   captured recently in structurally valid artifacts, inspected against
   specific checks, and recorded as content-bound evidence.
+- Communication is outcome-first and concise. Report material decisions,
+  blockers, risks, and evidence; omit play-by-play narration, repeated
+  summaries, raw logs, and exhaustive file lists unless requested.

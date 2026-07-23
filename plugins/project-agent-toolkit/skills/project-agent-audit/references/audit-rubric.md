@@ -23,6 +23,12 @@
 - Does every registered rule name a validation profile?
 - Are validation profiles invoked by a route, default, or rule?
 - Are generated adapters current with their canonical configuration?
+- Does each test or guard name a plausible failure or observable contract that
+  it can independently falsify?
+- Are implementation-mirroring, trivial, redundant, or superseded tests
+  increasing maintenance cost without improving confidence?
+- Does policy select the least expensive sufficient evidence instead of
+  optimizing for test count, coverage percentage, or the broadest gate?
 
 ## Roles
 
@@ -37,6 +43,8 @@
 - Does the checkpoint distinguish delivered, verified, blocked, and next?
 - Is transient output kept out of canonical policy?
 - Is validation evidence tied to the tested revision and dirty state?
+- Do status and completion conventions stay outcome-first, or require routine
+  narration, repeated summaries, log dumps, and exhaustive inventories?
 
 ## Tooling hygiene
 

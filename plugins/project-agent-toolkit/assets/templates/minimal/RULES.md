@@ -1,16 +1,24 @@
 # Project rules
 
 Keep only non-negotiable, mechanically meaningful project constraints here.
-Prefer a guard or test for every rule that can be checked automatically.
+Prefer one existing mechanical check for a rule when it can be enforced
+reliably; do not multiply guards for the same invariant.
 
 ## Change discipline
 
 - Preserve unrelated work.
 - Do not bypass validation or hooks to make a change appear complete.
 - Do not hide missing shared capability in a consumer-local workaround.
+- Prefer the simplest maintainable change that uses existing mechanisms.
+- Add or change a test only when it can falsify a plausible failure or protect
+  an observable contract not already proved by a cheaper check. Do not mirror
+  implementation, test trivial details, duplicate coverage, or optimize for
+  test count.
 - Do not claim evidence that was not produced from the current source contents.
 - Visual work requires fresh rendered evidence from the actual acceptance
   surface and concrete inspection checks.
+- Keep status and completion reports concise and outcome-first. Omit
+  play-by-play narration and raw logs unless requested.
 
 ## Repository-specific rules
 

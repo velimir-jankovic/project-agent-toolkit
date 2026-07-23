@@ -30,7 +30,9 @@ for understanding the code.
    - product or policy behavior belongs to the consumer;
    - compatibility shims need an explicit boundary and removal condition.
 
-6. Make the smallest coherent change. Preserve unrelated edits.
+6. Make the smallest coherent change. Prefer existing mechanisms, remove
+   duplication, and treat maintenance cost as part of correctness. Preserve
+   unrelated edits.
 7. Validate through routed profiles:
 
    ```console
@@ -41,8 +43,13 @@ for understanding the code.
      --claim "<claim being proved>"
    ```
 
-   Prefer a focused regression proof before a broad gate. Never substitute a
-   mock for the requested real workflow.
+   First name the plausible failure or observable contract. Add or change a
+   test only when it can falsify that failure and no cheaper existing check
+   already proves the claim. Prefer extending a focused or table-driven test;
+   do not mirror implementation, assert trivial details, duplicate coverage,
+   or optimize for test count. For a bug fix, show the regression against
+   pre-fix behavior when practical. Never substitute a mock for the requested
+   real workflow.
    When a configured visual route matches, use
    `$visual-change-verification`; the verification command requires rendered
    artifacts and an explicit review.
@@ -58,3 +65,10 @@ Delegate only a concrete, bounded subtask that can run independently. The root
 agent owns architecture, integration, final verification, and the completion
 claim. A role name describes responsibility; it does not justify a particular
 model or reasoning setting.
+
+## Communication
+
+Lead with the outcome. Send intermediate updates only for a material decision,
+result, blocker, or risk. Keep the completion report to the change, evidence,
+and unresolved work; omit routine narration, repeated summaries, raw logs, and
+exhaustive file lists unless requested.
