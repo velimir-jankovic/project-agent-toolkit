@@ -23,14 +23,59 @@ def run(label: str, command: list[str]) -> bool:
 def main() -> int:
     python = sys.executable
     checks = [
-        ("Python compile", [python, "-m", "compileall", "-q", "scripts", "tests"]),
+        (
+            "Python compile",
+            [
+                python,
+                "-m",
+                "compileall",
+                "-q",
+                "scripts",
+                "plugins/project-agent-toolkit/scripts",
+                "tests",
+            ],
+        ),
         ("Plugin structure", [python, "scripts/check_plugin.py"]),
-        ("Governance", [python, "scripts/governance.py", "check", "--root", "."]),
-        ("Generated adapters", [python, "scripts/governance.py", "generate", "--root", "."]),
-        ("Route contracts", [python, "scripts/governance.py", "route-test", "--root", "."]),
+        (
+            "Governance",
+            [
+                python,
+                "plugins/project-agent-toolkit/scripts/governance.py",
+                "check",
+                "--root",
+                ".",
+            ],
+        ),
+        (
+            "Generated adapters",
+            [
+                python,
+                "plugins/project-agent-toolkit/scripts/governance.py",
+                "generate",
+                "--root",
+                ".",
+            ],
+        ),
+        (
+            "Route contracts",
+            [
+                python,
+                "plugins/project-agent-toolkit/scripts/governance.py",
+                "route-test",
+                "--root",
+                ".",
+            ],
+        ),
         (
             "Governance coverage",
-            [python, "scripts/governance.py", "coverage", "--root", ".", "--strict"],
+            [
+                python,
+                "plugins/project-agent-toolkit/scripts/governance.py",
+                "coverage",
+                "--root",
+                ".",
+                "--strict",
+            ],
         ),
         ("Tests", [python, "-m", "unittest", "discover", "-s", "tests", "-v"]),
     ]

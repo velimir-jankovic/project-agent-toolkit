@@ -57,8 +57,8 @@
         "dependency"
       ],
       "paths": [
-        "scripts/governance.py",
-        "assets/templates/**"
+        "plugins/project-agent-toolkit/scripts/governance.py",
+        "plugins/project-agent-toolkit/assets/templates/**"
       ],
       "read": [
         "architecture",
@@ -80,7 +80,8 @@
         "refactor"
       ],
       "paths": [
-        "skills/**",
+        "plugins/project-agent-toolkit/skills/**",
+        "plugins/project-agent-toolkit/scripts/**",
         "scripts/**",
         "tests/**"
       ],

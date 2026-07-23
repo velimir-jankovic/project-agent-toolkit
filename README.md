@@ -3,6 +3,17 @@
 A project-neutral Codex plugin for keeping repository agent instructions
 small, task-scoped, testable, and easy to resume.
 
+## Install in Codex
+
+Add this GitHub repository as a marketplace, then install the plugin:
+
+```console
+codex plugin marketplace add velimir-jankovic/project-agent-toolkit
+codex plugin add project-agent-toolkit@project-agent-toolkit
+```
+
+Start a new Codex task after installation so the four skills are loaded.
+
 It separates two things that often become tangled:
 
 - reusable process: authority, task routing, planning, implementation,
@@ -25,15 +36,15 @@ layout. Projects describe their own policy in `.agent-governance.json`.
 ## CLI
 
 ```console
-python scripts/governance.py init --root C:\path\to\project
-python scripts/governance.py audit --root C:\path\to\project
-python scripts/governance.py route --root C:\path\to\project --task "change API" --path src/api/client.py
-python scripts/governance.py check --root C:\path\to\project
-python scripts/governance.py generate --root C:\path\to\project
-python scripts/governance.py route-test --root C:\path\to\project
-python scripts/governance.py coverage --root C:\path\to\project --strict
-python scripts/governance.py verify --root C:\path\to\project --task "change API" --claim "API contract is valid"
-python scripts/governance.py upgrade --root C:\path\to\project
+python plugins/project-agent-toolkit/scripts/governance.py init --root C:\path\to\project
+python plugins/project-agent-toolkit/scripts/governance.py audit --root C:\path\to\project
+python plugins/project-agent-toolkit/scripts/governance.py route --root C:\path\to\project --task "change API" --path src/api/client.py
+python plugins/project-agent-toolkit/scripts/governance.py check --root C:\path\to\project
+python plugins/project-agent-toolkit/scripts/governance.py generate --root C:\path\to\project
+python plugins/project-agent-toolkit/scripts/governance.py route-test --root C:\path\to\project
+python plugins/project-agent-toolkit/scripts/governance.py coverage --root C:\path\to\project --strict
+python plugins/project-agent-toolkit/scripts/governance.py verify --root C:\path\to\project --task "change API" --claim "API contract is valid"
+python plugins/project-agent-toolkit/scripts/governance.py upgrade --root C:\path\to\project
 ```
 
 `init` is additive by default and never overwrites an existing file. Use
@@ -98,5 +109,5 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - "Done" means the requested outcome exists and current evidence supports it.
 - Handoffs preserve decisions and next actions, not chat transcripts.
 
-See [governance-schema.md](skills/project-agent-audit/references/governance-schema.md)
+See [governance-schema.md](plugins/project-agent-toolkit/skills/project-agent-audit/references/governance-schema.md)
 for the configuration contract.

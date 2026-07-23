@@ -1,16 +1,20 @@
 # Architecture
 
-The repository has three independent layers:
+The repository has four independent layers:
 
-1. Codex plugin metadata and skills under `.codex-plugin/` and `skills/`.
-2. Project-neutral templates under `assets/templates/`.
-3. A dependency-free CLI under `scripts/` that initializes, routes, audits, and
-   checks a target repository.
+1. A Git-backed Codex marketplace catalog under `.agents/plugins/`.
+2. The distributable plugin under `plugins/project-agent-toolkit/`, including
+   metadata, skills, project-neutral templates, and the dependency-free
+   governance CLI.
+3. Repository development guards under `scripts/` and regression tests under
+   `tests/`.
+4. This repository's own governed policy and generated agent adapters.
 
 Skills define agent behavior. The CLI owns deterministic enforcement. Templates
 are data copied additively into a project. A target project's
 `.agent-governance.json` owns its authority graph, routes, budgets, tooling
 allowlist, and optional validation commands.
 
-No target project imports this repository as runtime application code. Plugin
-installation supplies skills; the CLI can also be used directly.
+No target project imports this repository as runtime application code.
+Marketplace installation supplies skills and their packaged CLI; contributors
+can also invoke that CLI directly from the source tree.

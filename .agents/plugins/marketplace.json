@@ -1,0 +1,20 @@
+{
+  "name": "project-agent-toolkit",
+  "interface": {
+    "displayName": "Project Agent Toolkit"
+  },
+  "plugins": [
+    {
+      "name": "project-agent-toolkit",
+      "source": {
+        "source": "local",
+        "path": "./plugins/project-agent-toolkit"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

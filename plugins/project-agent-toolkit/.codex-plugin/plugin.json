@@ -1,17 +1,29 @@
 {
   "name": "project-agent-toolkit",
-  "version": "0.2.0+codex.20260723062919",
+  "version": "0.2.0+codex.20260723070710",
   "description": "Project-neutral agent governance, routing, auditing, and handoff workflows.",
   "author": {
-    "name": "Project Agent Toolkit contributors"
+    "name": "Velimir Jankovic",
+    "url": "https://github.com/velimir-jankovic"
   },
+  "homepage": "https://github.com/velimir-jankovic/project-agent-toolkit",
+  "repository": "https://github.com/velimir-jankovic/project-agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "agents",
+    "governance",
+    "instructions",
+    "verification"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Project Agent Toolkit",
     "shortDescription": "Keep repository agent policy concise and verifiable.",
     "longDescription": "Bootstrap, audit, route, execute, and hand off project work without mixing reusable agent process with project-specific policy.",
-    "developerName": "Project Agent Toolkit contributors",
+    "developerName": "Velimir Jankovic",
     "category": "Developer Tools",
+    "websiteURL": "https://github.com/velimir-jankovic/project-agent-toolkit",
     "brandColor": "#3A86A8",
     "capabilities": [
       "Project governance bootstrap",
@@ -19,6 +31,10 @@
       "Task-scoped policy routing",
       "Evidence-backed handoffs"
     ],
-    "defaultPrompt": "Audit this repository's agent setup, identify context and authority problems, and propose the smallest safe improvement."
+    "defaultPrompt": [
+      "Audit this repository's agent setup.",
+      "Bootstrap project-neutral agent governance.",
+      "Create an evidence-backed project handoff."
+    ]
   }
 }

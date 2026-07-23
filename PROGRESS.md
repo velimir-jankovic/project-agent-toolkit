@@ -16,15 +16,15 @@ Deliver the first reusable, project-neutral Project Agent Toolkit release.
 
 ## Open risks
 
-- The personal marketplace source is registered. The current Windows Store app
-  denies direct execution of its bundled `codex.exe`, so CLI reinstall cannot
-  be verified from this shell; a fresh Codex task is still needed to confirm
-  ingestion.
+- Installation from the public GitHub marketplace still needs one clean-task
+  smoke test after the first push.
 
 ## Working tree
 
-- New standalone repository; no remote configured.
+- Standard Git-backed marketplace layout targets
+  `velimir-jankovic/project-agent-toolkit`.
 
 ## Next action
 
-Open a fresh Codex task and confirm the four toolkit skills are available.
+Install the plugin from GitHub and confirm the four toolkit skills are
+available in a fresh Codex task.

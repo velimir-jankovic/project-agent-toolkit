@@ -8,7 +8,13 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "governance.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[1]
+    / "plugins"
+    / "project-agent-toolkit"
+    / "scripts"
+    / "governance.py"
+)
 SPEC = importlib.util.spec_from_file_location("governance", SCRIPT)
 assert SPEC and SPEC.loader
 governance = importlib.util.module_from_spec(SPEC)

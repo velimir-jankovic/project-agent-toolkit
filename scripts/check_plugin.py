@@ -10,7 +10,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SKILLS = ROOT / "skills"
+PLUGIN_ROOT = ROOT / "plugins" / "project-agent-toolkit"
+SKILLS = PLUGIN_ROOT / "skills"
 FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 NAME = re.compile(r"^name:\s*([a-z0-9-]+)\s*$", re.MULTILINE)
 DESCRIPTION = re.compile(r"^description:\s*(.+)\s*$", re.MULTILINE)
@@ -22,7 +23,7 @@ def fail(errors: list[str], message: str) -> None:
 
 
 def check_manifest(errors: list[str]) -> None:
-    path = ROOT / ".codex-plugin" / "plugin.json"
+    path = PLUGIN_ROOT / ".codex-plugin" / "plugin.json"
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -78,7 +79,7 @@ def check_skills(errors: list[str]) -> None:
 
 
 def check_templates(errors: list[str]) -> None:
-    template_root = ROOT / "assets" / "templates"
+    template_root = PLUGIN_ROOT / "assets" / "templates"
     required = [
         "minimal/.agent-governance.json",
         "minimal/AGENTS.md",
@@ -100,6 +101,38 @@ def check_templates(errors: list[str]) -> None:
             fail(errors, f"{path.relative_to(ROOT)}: templates must not select a model")
         if "[TODO" in text or "TODO:" in text:
             fail(errors, f"{path.relative_to(ROOT)}: template TODO remains")
+
+
+def check_marketplace(errors: list[str]) -> None:
+    path = ROOT / ".agents" / "plugins" / "marketplace.json"
+    try:
+        marketplace = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(errors, f"{path.relative_to(ROOT)}: invalid marketplace: {exc}")
+        return
+
+    if marketplace.get("name") != "project-agent-toolkit":
+        fail(errors, f"{path.relative_to(ROOT)}: unexpected marketplace name")
+    entries = marketplace.get("plugins")
+    if not isinstance(entries, list):
+        fail(errors, f"{path.relative_to(ROOT)}: plugins must be a list")
+        return
+    matching = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("name") == "project-agent-toolkit"
+    ]
+    if len(matching) != 1:
+        fail(errors, f"{path.relative_to(ROOT)}: expected exactly one toolkit entry")
+        return
+    source = matching[0].get("source")
+    if source != {
+        "source": "local",
+        "path": "./plugins/project-agent-toolkit",
+    }:
+        fail(errors, f"{path.relative_to(ROOT)}: toolkit source path is invalid")
+    if not (PLUGIN_ROOT / ".codex-plugin" / "plugin.json").is_file():
+        fail(errors, f"{path.relative_to(ROOT)}: marketplace source has no manifest")
 
 
 def check_governance_contract(errors: list[str]) -> None:
@@ -144,6 +177,7 @@ def check_governance_contract(errors: list[str]) -> None:
 
 def main() -> int:
     errors: list[str] = []
+    check_marketplace(errors)
     check_manifest(errors)
     check_skills(errors)
     check_templates(errors)
