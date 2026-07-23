@@ -21,7 +21,7 @@ governance layer.
   surface metadata, and explicit review evidence.
 - Receipt creation requires a Git-ignored evidence directory, and validation
   receipts fail when project state or supplied artifacts change during checks.
-- The schema-v4 regression suite contains 23 passing tests and CI covers Linux,
+- The schema-v4 regression suite contains 24 passing tests and CI covers Linux,
   Windows, and macOS.
 
 ## Open risks

@@ -63,8 +63,31 @@ class Finding:
     path: str | None = None
 
 
+def normalize_project_relative(relative: str) -> str:
+    """Normalize a project-relative path without depending on host path aliases."""
+    portable = relative.replace("\\", "/")
+    if (
+        not portable
+        or PurePosixPath(portable).is_absolute()
+        or re.match(r"^[A-Za-z]:/", portable)
+    ):
+        raise ValueError(f"path must be project-relative: {relative}")
+    parts: list[str] = []
+    for part in portable.split("/"):
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError(f"path escapes project root: {relative}")
+            parts.pop()
+            continue
+        parts.append(part)
+    return "/".join(parts) if parts else "."
+
+
 def project_path(root: Path, relative: str) -> Path:
-    candidate = (root / relative).resolve()
+    normalized = normalize_project_relative(relative)
+    candidate = (root / Path(*PurePosixPath(normalized).parts)).resolve()
     try:
         candidate.relative_to(root.resolve())
     except ValueError as exc:
@@ -126,14 +149,15 @@ def ensure_evidence_ignore(root: Path) -> bool:
     return True
 
 
-def git_ignores_path(root: Path, path: Path) -> bool:
+def git_ignores_path(root: Path, relative: str) -> bool:
     """Return whether Git excludes a path that may not exist yet."""
     try:
-        relative = posix(path.resolve().relative_to(root.resolve()))
+        normalized = normalize_project_relative(relative)
+        project_path(root, normalized)
     except ValueError:
         return False
     result = subprocess.run(
-        ["git", "check-ignore", "--quiet", relative],
+        ["git", "check-ignore", "--quiet", normalized],
         cwd=root,
         capture_output=True,
         check=False,
@@ -1199,7 +1223,11 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         else:
             git_directory = root / ".git"
             if git_directory.exists():
-                probe = evidence_directory / ".project-agent-toolkit-ignore-probe"
+                normalized_evidence_directory = evidence["directory"].rstrip("/\\")
+                probe = (
+                    f"{normalized_evidence_directory}/"
+                    ".project-agent-toolkit-ignore-probe"
+                )
                 if not git_ignores_path(root, probe):
                     findings.append(
                         Finding(
@@ -1812,7 +1840,7 @@ def collect_visual_evidence(
             )
         artifact_records.append(
             {
-                "path": posix(path.relative_to(root)),
+                "path": normalize_project_relative(relative),
                 "size_bytes": path.stat().st_size,
                 "sha256": file_sha256(path),
                 "modified_at": datetime.fromtimestamp(
@@ -1901,9 +1929,8 @@ def verify(
         normalized_evidence_dir = relative_dir.rstrip("/\\")
         if not normalized_evidence_dir:
             raise ValueError("evidence.directory must be a non-empty relative path")
-        evidence_probe = project_path(
-            root,
-            f"{normalized_evidence_dir}/.project-agent-toolkit-ignore-probe",
+        evidence_probe = (
+            f"{normalized_evidence_dir}/.project-agent-toolkit-ignore-probe"
         )
         if not git_ignores_path(root, evidence_probe):
             raise ValueError(

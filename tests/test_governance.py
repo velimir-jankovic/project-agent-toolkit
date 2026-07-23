@@ -32,6 +32,20 @@ VALID_ONE_PIXEL_PNG = base64.b64decode(
 
 
 class GovernanceTests(unittest.TestCase):
+    def test_project_relative_paths_are_portable_and_cannot_escape(self) -> None:
+        self.assertEqual(
+            governance.normalize_project_relative(r"artifacts\ui.png"),
+            "artifacts/ui.png",
+        )
+        self.assertEqual(
+            governance.normalize_project_relative("artifacts/../ui.png"),
+            "ui.png",
+        )
+        with self.assertRaisesRegex(ValueError, "project-relative"):
+            governance.normalize_project_relative("C:/outside/file.png")
+        with self.assertRaisesRegex(ValueError, "escapes project root"):
+            governance.normalize_project_relative("../outside.png")
+
     def test_init_is_additive_and_auditable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
