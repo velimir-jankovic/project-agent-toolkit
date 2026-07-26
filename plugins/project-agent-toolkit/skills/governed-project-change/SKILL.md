@@ -33,7 +33,17 @@ for understanding the code.
 6. Make the smallest coherent change. Prefer existing mechanisms, remove
    duplication, and treat maintenance cost as part of correctness. Preserve
    unrelated edits.
-7. Validate through routed profiles:
+7. Before independent review or project-wide validation, the root integrates
+   every accepted slice, resolves overlaps and TODOs, and self-reviews the
+   current diff against ownership and acceptance criteria. Treat that state as
+   the candidate freeze. Delegated workers run only explicitly assigned
+   focused checks; the root owns shared routed validation.
+8. When independent verification is warranted or requested, give the verifier
+   the frozen candidate and its acceptance criteria. Resolve findings under
+   root ownership, then request targeted closure of those findings. Repeat the
+   complete review only when a fix changes the architecture, public boundary,
+   or acceptance surface.
+9. Validate through routed profiles:
 
    ```console
    python <plugin-root>/scripts/governance.py verify \
@@ -53,9 +63,13 @@ for understanding the code.
    When a configured visual route matches, use
    `$visual-change-verification`; the verification command requires rendered
    artifacts and an explicit review.
-8. Update canonical state only when the durable objective, decision, or next
+   Do not run a narrower profile immediately before a broader profile that
+   extends it on the same source. Run the broader profile once after the
+   candidate freeze unless the narrower result is needed to guide ongoing
+   implementation.
+10. Update canonical state only when the durable objective, decision, or next
    action changed.
-9. Before claiming completion, use
+11. Before claiming completion, use
    [execution-contract.md](references/execution-contract.md) and cite the
    current evidence receipt.
 
@@ -63,8 +77,11 @@ for understanding the code.
 
 Delegate only a concrete, bounded subtask that can run independently. The root
 agent owns architecture, integration, final verification, and the completion
-claim. A role name describes responsibility; it does not justify a particular
-model or reasoning setting.
+claim. Inputs from architects and explorers that can change the plan must be
+resolved before candidate freeze. A worker self-reviews its own diff and runs
+only assigned focused checks before returning integration notes; it does not
+spend the repository-wide validation budget. A role name describes
+responsibility; it does not justify a particular model or reasoning setting.
 
 ## Communication
 

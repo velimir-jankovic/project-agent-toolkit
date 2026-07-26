@@ -13,6 +13,15 @@
    test. Add no test when a compiler, static check, guard, or existing test
    already proves the claim.
 
+## Integrate
+
+Before independent review or `quality.py`, integrate every accepted slice,
+resolve overlaps and TODOs, and self-review the current diff against ownership
+and acceptance criteria. Treat that state as the candidate freeze. Delegated
+workers run only assigned focused local checks. If review finds blockers,
+resolve them under root ownership and request targeted closure; repeat the full
+review only when the acceptance surface changes.
+
 ## Verify
 
 Use the least expensive evidence capable of disproving the claim. For a bug
@@ -21,6 +30,10 @@ that is impractical, record why. Run `python scripts/quality.py` as this
 repository's release gate. For plugin ingestion changes, also run the current
 Codex plugin and skill validators when available. Test count and coverage
 percentage are not completion criteria.
+
+Do not run a narrower validation profile immediately before a broader profile
+that extends it on the same source. Run the broader profile once after
+candidate freeze unless the narrower result is needed to guide ongoing work.
 
 ## Communicate
 

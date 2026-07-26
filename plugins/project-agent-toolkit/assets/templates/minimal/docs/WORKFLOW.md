@@ -16,6 +16,16 @@
    extend one focused test; add nothing when cheaper evidence already proves
    the contract.
 
+## Integrate
+
+Before independent review or project-wide validation, the root integrates all
+accepted slices, resolves overlaps and TODOs, and self-reviews the current diff
+against ownership and acceptance criteria. Treat that state as the candidate
+freeze. Delegated workers run only explicitly assigned focused local checks.
+If a verifier finds blockers, fix them under root ownership and request
+targeted closure; repeat the full review only when the acceptance surface
+changes.
+
 ## Verify
 
 Run the least expensive checks capable of disproving the claim: focused static
@@ -25,6 +35,11 @@ when practical. Test count and coverage percentage are not outcomes. A check
 that was not run is not evidence. Configure at least one project-owned command
 in a routed validation profile before using `verify`; bootstrap profiles are
 empty by design.
+
+Validation profiles are cumulative. Do not run a narrower profile immediately
+before a broader profile that extends it on the same source; run the broader
+profile once after candidate freeze unless the narrower result is needed to
+guide ongoing implementation.
 
 ## Handoff
 

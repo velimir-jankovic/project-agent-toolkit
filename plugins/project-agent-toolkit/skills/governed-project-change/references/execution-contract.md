@@ -5,15 +5,20 @@ Before claiming a change complete, answer:
 1. Does the requested behavior exist on the current revision?
 2. Is the capability owned by the correct component?
 3. Were unrelated user changes preserved?
-4. What plausible failure or observable contract needed proof? Did an existing
+4. Was the integrated candidate self-reviewed and frozen before independent
+   verification or project-wide validation?
+5. If a verifier found blockers, were fixes checked through targeted closure
+   rather than restarting an unchanged full review?
+6. What plausible failure or observable contract needed proof? Did an existing
    check already cover it, or can the new proof fail independently of the
    implementation being tested?
-5. Which commands ran, and what did each prove?
-6. Which current evidence receipt records the revision, dirty state, and
+7. Which commands ran, and what did each prove? Was an inherited narrower
+   profile needlessly run immediately before its broader profile?
+8. Which current evidence receipt records the revision, dirty state, and
    results?
-7. Which relevant validation did not run?
-8. Did documentation or current state change durably?
-9. Is any required work still pending?
+9. Which relevant validation did not run?
+10. Did documentation or current state change durably?
+11. Is any required work still pending?
 
 If required work remains, report progress rather than completion.
 
