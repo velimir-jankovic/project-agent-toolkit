@@ -13,6 +13,7 @@ import struct
 import subprocess
 import sys
 import time
+import tomllib
 import zlib
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -303,6 +304,116 @@ def task_term_matches(task: str, term: str) -> bool:
     return re.search(rf"(?<!\w){pattern}(?!\w)", task.lower()) is not None
 
 
+def audit_codex_configuration(
+    root: Path,
+) -> tuple[list[Finding], dict[str, Any]]:
+    findings: list[Finding] = []
+    metrics: dict[str, Any] = {
+        "codex_config_present": False,
+        "agent_role_count": 0,
+        "agent_roles": [],
+        "agent_model_override_count": 0,
+        "agent_reasoning_override_count": 0,
+    }
+    config_path = root / ".codex" / "config.toml"
+    if config_path.is_file():
+        metrics["codex_config_present"] = True
+        try:
+            config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            findings.append(
+                Finding(
+                    "error",
+                    "codex.config-invalid",
+                    f"Codex configuration is not valid TOML: {exc}",
+                    ".codex/config.toml",
+                )
+            )
+        else:
+            agents = config.get("agents", {})
+            if isinstance(agents, dict):
+                for stale_key in ("max_depth", "job_max_runtime_seconds"):
+                    if stale_key in agents:
+                        findings.append(
+                            Finding(
+                                "warning",
+                                "codex.agent-setting-stale",
+                                (
+                                    f"agents.{stale_key} is not part of the "
+                                    "current documented Codex agent configuration"
+                                ),
+                                ".codex/config.toml",
+                            )
+                        )
+
+    role_directory = root / ".codex" / "agents"
+    if not role_directory.is_dir():
+        return findings, metrics
+
+    names: dict[str, str] = {}
+    role_paths = sorted(role_directory.glob("*.toml"))
+    for role_path in role_paths:
+        relative = posix(role_path.relative_to(root))
+        try:
+            role = tomllib.loads(role_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            findings.append(
+                Finding(
+                    "error",
+                    "codex.role-invalid",
+                    f"agent role is not valid TOML: {exc}",
+                    relative,
+                )
+            )
+            continue
+
+        valid = True
+        for field in ("name", "description", "developer_instructions"):
+            value = role.get(field)
+            if not isinstance(value, str) or not value.strip():
+                valid = False
+                findings.append(
+                    Finding(
+                        "error",
+                        "codex.role-field",
+                        f"agent role requires a non-empty {field}",
+                        relative,
+                    )
+                )
+        name = role.get("name")
+        if isinstance(name, str) and name.strip():
+            normalized_name = name.strip()
+            previous = names.get(normalized_name)
+            if previous is not None:
+                valid = False
+                findings.append(
+                    Finding(
+                        "error",
+                        "codex.role-duplicate",
+                        (
+                            f"agent role name {normalized_name!r} is already "
+                            f"defined by {previous}"
+                        ),
+                        relative,
+                    )
+                )
+            else:
+                names[normalized_name] = relative
+        if valid:
+            metrics["agent_roles"].append(name.strip())
+        if isinstance(role.get("model"), str) and role["model"].strip():
+            metrics["agent_model_override_count"] += 1
+        if (
+            isinstance(role.get("model_reasoning_effort"), str)
+            and role["model_reasoning_effort"].strip()
+        ):
+            metrics["agent_reasoning_override_count"] += 1
+
+    metrics["agent_roles"].sort()
+    metrics["agent_role_count"] = len(metrics["agent_roles"])
+    return findings, metrics
+
+
 def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
     config, findings = load_config(root)
     metrics: dict[str, Any] = {
@@ -313,9 +424,18 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         "route_count": 0,
         "development_interface_count": 0,
         "visual_route_count": 0,
+        "codex_config_present": False,
+        "agent_role_count": 0,
+        "agent_roles": [],
+        "agent_model_override_count": 0,
+        "agent_reasoning_override_count": 0,
     }
     if config is None:
         return findings, metrics
+
+    codex_findings, codex_metrics = audit_codex_configuration(root)
+    findings.extend(codex_findings)
+    metrics.update(codex_metrics)
 
     if config.get("version") != CURRENT_VERSION:
         findings.append(

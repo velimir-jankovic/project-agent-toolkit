@@ -20,7 +20,10 @@ of copying that policy into every agent entrypoint.
    ```
 
    Use `--profile full` only when generic roles and prompt adapters are wanted.
-   Do not use `--force` until the user has accepted overwriting existing files.
+   The full profile installs role definitions; it does not spawn them
+   automatically. The roles inherit the environment's model and reasoning
+   unless the target project or user configures overrides. Do not use `--force`
+   until the user has accepted overwriting existing files.
 
 4. Read
    [migration-playbook.md](references/migration-playbook.md) when adopting a
@@ -57,7 +60,9 @@ of copying that policy into every agent entrypoint.
 11. Test at least one architecture task, one implementation task, and one
    unrelated/default task. Confirm each route returns only useful authorities.
 12. Report files created, existing policy preserved, unresolved migration risks,
-   and exact validation.
+   and exact validation. Ask the user to start a new Codex task after adding or
+   changing project-scoped role files so discovery does not depend on live
+   configuration reload.
 
 ## Upgrade
 

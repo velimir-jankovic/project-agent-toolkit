@@ -63,6 +63,13 @@ Receipt creation is rejected in a Git worktree when the configured evidence
 directory is not ignored, so recording evidence cannot invalidate the source
 state it claims to verify.
 
+The full profile makes `architect`, `worker`, and `verifier` definitions
+available to Codex; it does not automatically spawn them. Templates do not
+select a model or reasoning effort, so roles inherit environment policy unless
+the target project's `.codex/agents/*.toml` files add explicit overrides.
+Start a new Codex task after changing project-scoped roles so discovery happens
+from a clean configuration boundary.
+
 `generate` keeps platform-facing agent adapters synchronized with one canonical
 configuration. It checks by default; `--write` updates only managed files, and
 `--force` is required to adopt an unmanaged existing file.

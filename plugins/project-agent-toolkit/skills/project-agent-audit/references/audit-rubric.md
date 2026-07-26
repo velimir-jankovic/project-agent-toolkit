@@ -36,6 +36,10 @@
   useful?
 - Does the root retain integration and completion ownership?
 - Are role semantics independent of a specific model?
+- Do project-scoped Codex role files parse and provide the required name,
+  description, and developer instructions?
+- Is it explicit that installed role definitions remain dormant until spawned
+  and inherit model/effort unless the environment overrides them?
 
 ## State
 

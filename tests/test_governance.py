@@ -73,6 +73,57 @@ class GovernanceTests(unittest.TestCase):
             self.assertFalse([f for f in findings if f.severity == "error"])
             self.assertGreater(metrics["authority_count"], 0)
 
+    def test_full_init_adds_current_valid_agent_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            self.assertEqual(governance.initialize(root, "full", False), 0)
+            config = governance.tomllib.loads(
+                root.joinpath(".codex/config.toml").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                config["agents"],
+                {
+                    "max_concurrent_threads_per_session": 4,
+                    "interrupt_message": True,
+                },
+            )
+
+            findings, metrics = governance.audit(root)
+            role_errors = [
+                finding
+                for finding in findings
+                if finding.code.startswith("codex.")
+            ]
+            self.assertEqual(role_errors, [])
+            self.assertEqual(metrics["agent_role_count"], 3)
+            self.assertEqual(
+                metrics["agent_roles"],
+                ["architect", "verifier", "worker"],
+            )
+            self.assertEqual(metrics["agent_model_override_count"], 0)
+            self.assertEqual(metrics["agent_reasoning_override_count"], 0)
+
+    def test_audit_rejects_invalid_codex_role(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "full", False)
+            root.joinpath(".codex/agents/worker.toml").write_text(
+                (
+                    'name = "worker"\n'
+                    'description = "Implementation worker."\n'
+                ),
+                encoding="utf-8",
+            )
+
+            findings, metrics = governance.audit(root)
+
+            self.assertIn(
+                "codex.role-field",
+                {finding.code for finding in findings},
+            )
+            self.assertEqual(metrics["agent_role_count"], 2)
+
     def test_broken_authority_is_an_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

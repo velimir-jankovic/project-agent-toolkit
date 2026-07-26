@@ -32,3 +32,9 @@ and recorded inspection in addition to those commands. Evidence v2 snapshots
 the revision, tracked diff, untracked contents, governance configuration, and
 visual hashes before validation, then rejects source or artifact mutation
 during the guard run.
+
+The optional full bootstrap profile installs project-scoped Codex role
+definitions and prompt adapters. Role availability is distinct from
+orchestration: the root or user still chooses when to spawn a role. The
+templates remain model-neutral, while the audit validates role structure and
+reports whether a target project has explicit model or reasoning overrides.

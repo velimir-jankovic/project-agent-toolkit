@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -88,6 +89,13 @@ def check_templates(errors: list[str]) -> None:
         "minimal/docs/ARCHITECTURE.md",
         "minimal/docs/WORKFLOW.md",
         "minimal/PROGRESS.md",
+        "full/.codex/config.toml",
+        "full/.codex/agents/architect.toml",
+        "full/.codex/agents/verifier.toml",
+        "full/.codex/agents/worker.toml",
+        "full/.github/prompts/handoff.prompt.md",
+        "full/.github/prompts/resume.prompt.md",
+        "full/.github/prompts/review.prompt.md",
     ]
     for relative in required:
         if not (template_root / relative).is_file():
@@ -118,6 +126,68 @@ def check_templates(errors: list[str]) -> None:
                         f"missing {required_field}"
                     ),
                 )
+
+    full_config_path = template_root / "full" / ".codex" / "config.toml"
+    try:
+        full_config = tomllib.loads(
+            full_config_path.read_text(encoding="utf-8")
+        )
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        fail(
+            errors,
+            f"{full_config_path.relative_to(ROOT)}: invalid TOML: {exc}",
+        )
+    else:
+        if full_config.get("agents") != {
+            "max_concurrent_threads_per_session": 4,
+            "interrupt_message": True,
+        }:
+            fail(
+                errors,
+                (
+                    f"{full_config_path.relative_to(ROOT)}: agents must use "
+                    "the current bounded-thread configuration"
+                ),
+            )
+
+    role_names: set[str] = set()
+    for role_path in sorted(
+        (template_root / "full" / ".codex" / "agents").glob("*.toml")
+    ):
+        try:
+            role = tomllib.loads(role_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            fail(
+                errors,
+                f"{role_path.relative_to(ROOT)}: invalid TOML: {exc}",
+            )
+            continue
+        for field in ("name", "description", "developer_instructions"):
+            value = role.get(field)
+            if not isinstance(value, str) or not value.strip():
+                fail(
+                    errors,
+                    (
+                        f"{role_path.relative_to(ROOT)}: missing non-empty "
+                        f"{field}"
+                    ),
+                )
+        name = role.get("name")
+        if isinstance(name, str):
+            if name in role_names:
+                fail(
+                    errors,
+                    (
+                        f"{role_path.relative_to(ROOT)}: duplicate role name "
+                        f"{name}"
+                    ),
+                )
+            role_names.add(name)
+    if role_names != {"architect", "verifier", "worker"}:
+        fail(
+            errors,
+            "assets/templates/full/.codex/agents: expected three generic roles",
+        )
 
     for path in template_root.rglob("*"):
         if not path.is_file():

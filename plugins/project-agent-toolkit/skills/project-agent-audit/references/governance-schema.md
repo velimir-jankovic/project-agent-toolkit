@@ -202,3 +202,9 @@ evidence receipt.
 
 Tool configuration directories should not contain virtual environments,
 certificates, caches, databases, downloads, or logs.
+
+The audit also inspects project-scoped `.codex/config.toml` and
+`.codex/agents/*.toml` when present. Role files must be valid TOML with
+non-empty `name`, `description`, and `developer_instructions` fields. Audit
+metrics report role names plus explicit model and reasoning override counts;
+zero overrides means those roles inherit environment policy.

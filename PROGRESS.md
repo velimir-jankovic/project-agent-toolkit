@@ -12,6 +12,9 @@ governance layer.
   handoff skills are installed and discoverable.
 - Minimal and full templates avoid model, language, framework, and product
   assumptions.
+- Full bootstrap roles use current Codex agent settings, are structurally
+  audited, and explicitly distinguish role availability from automatic
+  dispatch and environment-owned model/effort selection.
 - Unit, structure, governance, hook, and CI guards are present.
 - Generated adapters, route contracts, validation profiles, content-bound
   evidence receipts, versioned migrations, and coverage reporting implemented.
@@ -21,7 +24,7 @@ governance layer.
   surface metadata, and explicit review evidence.
 - Receipt creation requires a Git-ignored evidence directory, and validation
   receipts fail when project state or supplied artifacts change during checks.
-- The schema-v4 regression suite contains 24 passing tests and CI covers Linux,
+- The schema-v4 regression suite contains 26 passing tests and CI covers Linux,
   Windows, and macOS.
 
 ## Open risks
