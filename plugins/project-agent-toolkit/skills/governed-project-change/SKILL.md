@@ -21,10 +21,11 @@ for understanding the code.
    ```
 
 3. Read every returned authority completely. Start implementation inspection
-   with the returned capability owners. Broaden beyond them only when the
-   traced call path, dependency, or observed failure requires it. Projects
-   without a capability map return policy normally and require targeted
-   discovery.
+   with direct capability owners. Inspect a dependency capability's owners
+   only when the change, traced call path, or observed failure crosses that
+   boundary. Broaden beyond the map only when concrete evidence requires it.
+   Projects without a capability map return policy normally and require
+   targeted discovery.
 4. Classify the request: answer, diagnose, design, implement, review, or
    monitor. Do not infer authorization for a materially different action.
    Also classify whether the user expects repeated iteration. In iteration

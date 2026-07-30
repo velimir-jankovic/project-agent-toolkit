@@ -91,7 +91,8 @@ which small set of implementation files owns the requested behavior:
 capability matches, their transitive dependencies, and de-duplicated owner
 paths. Owner paths must exist and remain within the project. The configured
 `limits.capability_owner_max_count` warns when one capability stops being a
-useful low-context starting point.
+useful low-context starting point. Agents begin with direct owners and inspect
+dependency owners only when the task crosses that declared boundary.
 
 Capability tests keep project-specific ownership maps from silently drifting:
 

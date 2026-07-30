@@ -1762,8 +1762,9 @@ def render_adapter(config: dict[str, Any], kind: str) -> str:
             "Read [.github/copilot-instructions.md](.github/copilot-instructions.md).\n"
             f"Use [{CONFIG_NAME}]({CONFIG_NAME}) to load only the authorities routed for\n"
             "the current task and likely changed paths. When a capability map is\n"
-            "configured, start code inspection from the owners returned by the toolkit's\n"
-            "`context` command. Project-specific policy belongs in routed authorities.\n"
+            "configured, start with direct owners returned by the toolkit's `context`\n"
+            "command; inspect dependency owners only when crossing that boundary.\n"
+            "Project-specific policy belongs in routed authorities.\n"
         )
     if kind != "copilot":
         raise ValueError(f"unknown adapter kind: {kind}")
@@ -1788,7 +1789,7 @@ def render_adapter(config: dict[str, Any], kind: str) -> str:
         "## Working contract\n\n"
         "- Inspect relevant implementation and version-control state before editing.\n"
         "- Preserve unrelated user changes.\n"
-        "- Start from routed capability owners; broaden only when traced dependencies require it.\n"
+        "- Start from direct capability owners; inspect dependency owners only when crossing that boundary.\n"
         "- Decide capability ownership before placing code or policy.\n"
         "- Make the smallest coherent change that achieves the requested outcome.\n"
         "- Validate in proportion to risk and report only current evidence.\n"

@@ -19,7 +19,7 @@ silently override higher ones.
 
 - Inspect relevant implementation and version-control state before editing.
 - Preserve unrelated user changes.
-- Start from routed capability owners; broaden only when traced dependencies require it.
+- Start from direct capability owners; inspect dependency owners only when crossing that boundary.
 - Decide capability ownership before placing code or policy.
 - Make the smallest coherent change that achieves the requested outcome.
 - Validate in proportion to risk and report only current evidence.
