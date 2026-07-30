@@ -208,6 +208,8 @@
       ]
     }
   ],
+  "capabilities": [],
+  "capability_tests": [],
   "rules": [],
   "development_interfaces": [],
   "visual_validation": {
@@ -223,7 +225,8 @@
   "limits": {
     "entrypoint_max_lines": 120,
     "always_loaded_max_chars": 30000,
-    "duplicate_paragraph_min_chars": 180
+    "duplicate_paragraph_min_chars": 180,
+    "capability_owner_max_count": 8
   },
   "tooling": {
     "roots": [

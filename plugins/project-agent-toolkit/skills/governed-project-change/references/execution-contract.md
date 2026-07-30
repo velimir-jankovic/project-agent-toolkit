@@ -1,5 +1,12 @@
 # Completion contract
 
+This contract applies to verified completion. For work the user expects to
+iterate, self-review the coherent slice and run at most one cheapest relevant
+sanity check. Add no tests for volatile details, run no independent review or
+broad gate, and create no evidence receipt. A stable contract or regression
+that will survive the iteration may justify one focused test. An explicit user
+request for no validation skips the sanity check.
+
 Before claiming a change complete, answer:
 
 1. Does the requested behavior exist on the current revision?
@@ -23,6 +30,9 @@ Before claiming a change complete, answer:
 If required work remains, report progress rather than completion.
 
 ## Evidence ladder
+
+Iteration mode uses at most the first applicable rung. A user-requested
+checkpoint, review, or release may move higher.
 
 Use the lowest sufficient rung, then move upward with risk:
 

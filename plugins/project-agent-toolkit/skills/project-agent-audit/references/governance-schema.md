@@ -12,6 +12,8 @@ version `4` is current.
 - `authorities`: canonical project documents.
 - `routes`: task/path routing to authorities and validation profiles.
 - `route_tests`: deterministic routing contracts.
+- `capabilities`: optional task/path routing to concise implementation owners.
+- `capability_tests`: deterministic capability ownership contracts.
 - `rules`: registered durable rules and their guards.
 - `development_interfaces`: optional development-only control surfaces,
   including MCP activation and production policy.
@@ -68,6 +70,48 @@ none match, the route named `default` is used.
 ```
 
 Order is contractual because it is the reading order presented to agents.
+
+## Capability map
+
+Policy routes answer which rules apply. Capability entries separately answer
+which small set of implementation files owns the requested behavior:
+
+```json
+{
+  "id": "drafting",
+  "purpose": "Author legal draft transitions.",
+  "terms": ["draft", "reroll"],
+  "paths": ["src/draft/**"],
+  "owners": ["src/draft/system.py", "src/draft/types.py"],
+  "depends_on": ["build-resolution"]
+}
+```
+
+`governance.py context` returns routed authorities, validation profiles, direct
+capability matches, their transitive dependencies, and de-duplicated owner
+paths. Owner paths must exist and remain within the project. The configured
+`limits.capability_owner_max_count` warns when one capability stops being a
+useful low-context starting point.
+
+Capability tests keep project-specific ownership maps from silently drifting:
+
+```json
+{
+  "id": "draft-context",
+  "task": "add a draft choice",
+  "paths": ["src/draft/system.py"],
+  "expect_capabilities": ["drafting", "build-resolution"],
+  "expect_owners": [
+    "src/draft/system.py",
+    "src/draft/types.py",
+    "src/build/resolver.py"
+  ]
+}
+```
+
+The map is not an exhaustive dependency graph and does not replace code
+inspection. It is a bounded starting surface that prevents every task from
+rediscovering subsystem ownership through broad repository reads.
 
 ## Generated adapter
 

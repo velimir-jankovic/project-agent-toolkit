@@ -422,6 +422,7 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         "always_loaded_chars": 0,
         "authority_count": 0,
         "route_count": 0,
+        "capability_count": 0,
         "development_interface_count": 0,
         "visual_route_count": 0,
         "codex_config_present": False,
@@ -474,6 +475,13 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         findings,
         "limits.duplicate-paragraph-min-chars",
         "limits.duplicate_paragraph_min_chars must be a positive integer",
+    )
+    capability_owner_limit = configured_positive_int(
+        limits.get("capability_owner_max_count", 8),
+        8,
+        findings,
+        "limits.capability-owner-max-count",
+        "limits.capability_owner_max_count must be a positive integer",
     )
 
     entrypoints = config.get("entrypoints", [])
@@ -638,6 +646,14 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         findings.append(
             Finding("warning", "route.no-default", "no route named default is configured", CONFIG_NAME)
         )
+
+    capability_findings, capability_ids = validate_capabilities(
+        root,
+        config,
+        capability_owner_limit,
+    )
+    findings.extend(capability_findings)
+    metrics["capability_count"] = len(capability_ids)
 
     visual_validation = config.get("visual_validation")
     if visual_validation is not None and not isinstance(visual_validation, dict):
@@ -1243,6 +1259,7 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         findings.extend(generate_adapters(root, config, write=False, force=False))
 
     findings.extend(route_test_findings(config))
+    findings.extend(capability_test_findings(config))
 
     rules = config.get("rules", [])
     if not isinstance(rules, list):
@@ -1366,6 +1383,7 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
     for key in (
         "unrouted_authorities",
         "untested_routes",
+        "untested_capabilities",
         "unused_validation_profiles",
         "unguarded_rules",
     ):
@@ -1450,6 +1468,283 @@ def route_documents(root: Path, task: str, paths: list[str]) -> tuple[list[str],
     return details["documents"], details["routes"]
 
 
+def validate_capabilities(
+    root: Path,
+    config: dict[str, Any],
+    owner_limit: int,
+) -> tuple[list[Finding], set[str]]:
+    findings: list[Finding] = []
+    raw_capabilities = config.get("capabilities", [])
+    if not isinstance(raw_capabilities, list):
+        return (
+            [
+                Finding(
+                    "error",
+                    "config.capabilities",
+                    "capabilities must be an array",
+                    CONFIG_NAME,
+                )
+            ],
+            set(),
+        )
+
+    capabilities: dict[str, dict[str, Any]] = {}
+    for index, capability in enumerate(raw_capabilities):
+        if not isinstance(capability, dict):
+            findings.append(
+                Finding(
+                    "error",
+                    "capability.invalid",
+                    f"capability {index} must be an object",
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        identifier = capability.get("id")
+        if not isinstance(identifier, str) or not identifier.strip():
+            findings.append(
+                Finding(
+                    "error",
+                    "capability.id",
+                    f"capability {index} needs a non-empty id",
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        identifier = identifier.strip()
+        if identifier in capabilities:
+            findings.append(
+                Finding(
+                    "error",
+                    "capability.duplicate",
+                    f"duplicate capability id: {identifier}",
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        capabilities[identifier] = capability
+
+        purpose = capability.get("purpose")
+        if not isinstance(purpose, str) or not purpose.strip():
+            findings.append(
+                Finding(
+                    "error",
+                    "capability.purpose",
+                    f"capability {identifier} needs a concise purpose",
+                    CONFIG_NAME,
+                )
+            )
+        for key in ("terms", "paths", "owners", "depends_on"):
+            value = capability.get(key, [])
+            if (
+                not isinstance(value, list)
+                or not all(isinstance(item, str) and item.strip() for item in value)
+            ):
+                findings.append(
+                    Finding(
+                        "error",
+                        f"capability.{key.replace('_', '-')}",
+                        (
+                            f"capability {identifier} field {key} must be an "
+                            "array of non-empty strings"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+        terms = capability.get("terms", [])
+        paths = capability.get("paths", [])
+        if isinstance(terms, list) and isinstance(paths, list) and not terms and not paths:
+            findings.append(
+                Finding(
+                    "error",
+                    "capability.matcher",
+                    f"capability {identifier} needs at least one term or path matcher",
+                    CONFIG_NAME,
+                )
+            )
+        owners = capability.get("owners", [])
+        if isinstance(owners, list):
+            if not owners:
+                findings.append(
+                    Finding(
+                        "error",
+                        "capability.owners",
+                        f"capability {identifier} needs at least one owner path",
+                        CONFIG_NAME,
+                    )
+                )
+            if len(owners) > owner_limit:
+                findings.append(
+                    Finding(
+                        "warning",
+                        "capability.too-many-owners",
+                        (
+                            f"capability {identifier} lists {len(owners)} owners; "
+                            f"configured limit is {owner_limit}"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+            for owner in owners:
+                if not isinstance(owner, str) or not owner.strip():
+                    continue
+                try:
+                    owner_path = project_path(root, owner)
+                except ValueError as exc:
+                    findings.append(
+                        Finding(
+                            "error",
+                            "capability.owner-path",
+                            str(exc),
+                            CONFIG_NAME,
+                        )
+                    )
+                    continue
+                if not owner_path.exists():
+                    findings.append(
+                        Finding(
+                            "error",
+                            "capability.owner-missing",
+                            (
+                                f"capability {identifier} owner does not exist: "
+                                f"{owner}"
+                            ),
+                            CONFIG_NAME,
+                        )
+                    )
+
+    for identifier, capability in capabilities.items():
+        dependencies = capability.get("depends_on", [])
+        if not isinstance(dependencies, list):
+            continue
+        for dependency in dependencies:
+            if dependency == identifier:
+                findings.append(
+                    Finding(
+                        "error",
+                        "capability.self-dependency",
+                        f"capability {identifier} depends on itself",
+                        CONFIG_NAME,
+                    )
+                )
+            elif dependency not in capabilities:
+                findings.append(
+                    Finding(
+                        "error",
+                        "capability.unknown-dependency",
+                        (
+                            f"capability {identifier} references unknown "
+                            f"dependency {dependency}"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(identifier: str) -> None:
+        if identifier in visited:
+            return
+        if identifier in visiting:
+            findings.append(
+                Finding(
+                    "error",
+                    "capability.dependency-cycle",
+                    f"capability dependency cycle includes {identifier}",
+                    CONFIG_NAME,
+                )
+            )
+            return
+        visiting.add(identifier)
+        dependencies = capabilities[identifier].get("depends_on", [])
+        if isinstance(dependencies, list):
+            for dependency in dependencies:
+                if dependency in capabilities:
+                    visit(dependency)
+        visiting.remove(identifier)
+        visited.add(identifier)
+
+    for identifier in capabilities:
+        visit(identifier)
+    return findings, set(capabilities)
+
+
+def capability_details(
+    config: dict[str, Any],
+    task: str,
+    paths: list[str],
+) -> dict[str, Any]:
+    ordered = [
+        capability
+        for capability in config.get("capabilities", [])
+        if isinstance(capability, dict)
+        and isinstance(capability.get("id"), str)
+    ]
+    by_id = {str(capability["id"]): capability for capability in ordered}
+    task_lower = task.lower()
+    direct = [
+        str(capability["id"])
+        for capability in ordered
+        if (
+            any(
+                task_term_matches(task_lower, str(term))
+                for term in capability.get("terms", [])
+            )
+            or any(
+                fnmatch.fnmatchcase(posix(path), str(pattern))
+                for path in paths
+                for pattern in capability.get("paths", [])
+            )
+        )
+    ]
+
+    selected: list[str] = []
+
+    def add(identifier: str) -> None:
+        if identifier in selected or identifier not in by_id:
+            return
+        selected.append(identifier)
+        for dependency in by_id[identifier].get("depends_on", []):
+            add(str(dependency))
+
+    for identifier in direct:
+        add(identifier)
+
+    capabilities: list[dict[str, Any]] = []
+    owners: list[str] = []
+    for identifier in selected:
+        capability = by_id[identifier]
+        capability_owners = [
+            str(owner)
+            for owner in capability.get("owners", [])
+        ]
+        capabilities.append(
+            {
+                "id": identifier,
+                "purpose": str(capability.get("purpose", "")),
+                "direct": identifier in direct,
+                "owners": capability_owners,
+            }
+        )
+        owners.extend(capability_owners)
+    return {
+        "capabilities": capabilities,
+        "owners": list(dict.fromkeys(owners)),
+    }
+
+
+def context_details(
+    config: dict[str, Any],
+    task: str,
+    paths: list[str],
+) -> dict[str, Any]:
+    return {
+        **route_details(config, task, paths),
+        **capability_details(config, task, paths),
+    }
+
+
 def render_adapter(config: dict[str, Any], kind: str) -> str:
     project = config.get("project", {})
     project_name = str(project.get("name", "Project")).strip() or "Project"
@@ -1466,8 +1761,9 @@ def render_adapter(config: dict[str, Any], kind: str) -> str:
             f"# {project_name} agent instructions\n\n"
             "Read [.github/copilot-instructions.md](.github/copilot-instructions.md).\n"
             f"Use [{CONFIG_NAME}]({CONFIG_NAME}) to load only the authorities routed for\n"
-            "the current task and likely changed paths. Project-specific policy belongs\n"
-            "in those authorities, not in this generated entrypoint.\n"
+            "the current task and likely changed paths. When a capability map is\n"
+            "configured, start code inspection from the owners returned by the toolkit's\n"
+            "`context` command. Project-specific policy belongs in routed authorities.\n"
         )
     if kind != "copilot":
         raise ValueError(f"unknown adapter kind: {kind}")
@@ -1492,6 +1788,7 @@ def render_adapter(config: dict[str, Any], kind: str) -> str:
         "## Working contract\n\n"
         "- Inspect relevant implementation and version-control state before editing.\n"
         "- Preserve unrelated user changes.\n"
+        "- Start from routed capability owners; broaden only when traced dependencies require it.\n"
         "- Decide capability ownership before placing code or policy.\n"
         "- Make the smallest coherent change that achieves the requested outcome.\n"
         "- Validate in proportion to risk and report only current evidence.\n"
@@ -2178,6 +2475,84 @@ def route_test_findings(config: dict[str, Any]) -> list[Finding]:
     return findings
 
 
+def capability_test_findings(config: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    tests = config.get("capability_tests", [])
+    if not isinstance(tests, list):
+        return [
+            Finding(
+                "error",
+                "capability-tests.invalid",
+                "capability_tests must be an array",
+                CONFIG_NAME,
+            )
+        ]
+    for index, test in enumerate(tests):
+        if not isinstance(test, dict):
+            findings.append(
+                Finding(
+                    "error",
+                    "capability-test.invalid",
+                    f"capability test {index} must be an object",
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        identifier = str(test.get("id", index))
+        task = str(test.get("task", ""))
+        paths = test.get("paths", [])
+        if not isinstance(paths, list) or not all(
+            isinstance(path, str) for path in paths
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    "capability-test.paths",
+                    f"capability test {identifier} paths are invalid",
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        actual = capability_details(config, task, paths)
+        actual_capabilities = [
+            item["id"] for item in actual["capabilities"]
+        ]
+        for field, actual_value in (
+            ("expect_capabilities", actual_capabilities),
+            ("expect_owners", actual["owners"]),
+        ):
+            expected = test.get(field)
+            if expected is None:
+                continue
+            if not isinstance(expected, list) or not all(
+                isinstance(item, str) for item in expected
+            ):
+                findings.append(
+                    Finding(
+                        "error",
+                        "capability-test.expectation",
+                        (
+                            f"capability test {identifier} field {field} "
+                            "is invalid"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+            elif actual_value != expected:
+                findings.append(
+                    Finding(
+                        "error",
+                        "capability-test.failed",
+                        (
+                            f"{identifier} expected {field}={expected!r}, "
+                            f"got {actual_value!r}"
+                        ),
+                        CONFIG_NAME,
+                    )
+                )
+    return findings
+
+
 def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
     authorities = {
         str(item.get("id"))
@@ -2203,6 +2578,21 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
         route
         for test in tests
         for route in test.get("expect_routes", [])
+    }
+    capabilities = {
+        str(item.get("id"))
+        for item in config.get("capabilities", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    capability_tests = [
+        item
+        for item in config.get("capability_tests", [])
+        if isinstance(item, dict)
+    ]
+    tested_capabilities = {
+        capability
+        for test in capability_tests
+        for capability in test.get("expect_capabilities", [])
     }
     profiles = set(config.get("validation", {}).get("profiles", {}).keys())
     referenced_profiles = {
@@ -2244,11 +2634,19 @@ def coverage_report(config: dict[str, Any]) -> dict[str, Any]:
             for route in routes
             if route["id"] != "default" and route["id"] not in tested_routes
         ),
+        "untested_capabilities": sorted(
+            capabilities - tested_capabilities
+        ),
         "unused_validation_profiles": sorted(profiles - referenced_profiles),
         "unguarded_rules": sorted(unguarded_rules),
         "failing_route_tests": [
             asdict(finding)
             for finding in route_test_findings(config)
+            if finding.severity == "error"
+        ],
+        "failing_capability_tests": [
+            asdict(finding)
+            for finding in capability_test_findings(config)
             if finding.severity == "error"
         ],
     }
@@ -2501,6 +2899,15 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser.add_argument("--path", action="append", default=[])
     route_parser.add_argument("--json", action="store_true")
 
+    context_parser = subparsers.add_parser(
+        "context",
+        help="print task-scoped policy and capability owners",
+    )
+    context_parser.add_argument("--root", type=Path, default=Path.cwd())
+    context_parser.add_argument("--task", default="")
+    context_parser.add_argument("--path", action="append", default=[])
+    context_parser.add_argument("--json", action="store_true")
+
     route_test_parser = subparsers.add_parser("route-test", help="run configured routing contracts")
     route_test_parser.add_argument("--root", type=Path, default=Path.cwd())
     route_test_parser.add_argument("--json", action="store_true")
@@ -2560,20 +2967,55 @@ def main(argv: list[str] | None = None) -> int:
             if details["validation_profiles"]:
                 print(f"Validation: {', '.join(details['validation_profiles'])}")
         return 0 if details["documents"] else 1
+    if args.command == "context":
+        config, config_findings = load_config(root)
+        if config is None:
+            for finding in config_findings:
+                print(f"ERROR {finding.message}", file=sys.stderr)
+            return 1
+        details = context_details(config, args.task, args.path)
+        if args.json:
+            print(json.dumps(details, indent=2))
+        else:
+            print(
+                f"Matched routes: "
+                f"{', '.join(details['routes']) if details['routes'] else 'none'}"
+            )
+            for document in details["documents"]:
+                print(document)
+            if details["capabilities"]:
+                print("Capability owners:")
+                for capability in details["capabilities"]:
+                    dependency = "" if capability["direct"] else " (dependency)"
+                    print(
+                        f"  {capability['id']}{dependency}: "
+                        f"{capability['purpose']}"
+                    )
+                    for owner in capability["owners"]:
+                        print(f"    {owner}")
+            if details["validation_profiles"]:
+                print(f"Validation: {', '.join(details['validation_profiles'])}")
+        return 0 if details["documents"] else 1
     if args.command == "route-test":
         config, config_findings = load_config(root)
         if config is None:
             for finding in config_findings:
                 print(f"ERROR {finding.message}", file=sys.stderr)
             return 1
-        findings = route_test_findings(config)
+        findings = [
+            *route_test_findings(config),
+            *capability_test_findings(config),
+        ]
         if args.json:
             print(json.dumps([asdict(finding) for finding in findings], indent=2))
         elif findings:
             for finding in findings:
                 print(f"{finding.severity.upper()} {finding.code}: {finding.message}")
         else:
-            print(f"route-test: OK ({len(config.get('route_tests', []))} contract(s))")
+            contract_count = len(config.get("route_tests", [])) + len(
+                config.get("capability_tests", [])
+            )
+            print(f"route-test: OK ({contract_count} contract(s))")
         return 1 if any(finding.severity == "error" for finding in findings) else 0
     if args.command == "generate":
         config, config_findings = load_config(root)

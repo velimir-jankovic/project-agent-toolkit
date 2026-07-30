@@ -45,6 +45,7 @@ layout. Projects describe their own policy in `.agent-governance.json`.
 python plugins/project-agent-toolkit/scripts/governance.py init --root C:\path\to\project
 python plugins/project-agent-toolkit/scripts/governance.py audit --root C:\path\to\project
 python plugins/project-agent-toolkit/scripts/governance.py route --root C:\path\to\project --task "change API" --path src/api/client.py
+python plugins/project-agent-toolkit/scripts/governance.py context --root C:\path\to\project --task "change API" --path src/api/client.py
 python plugins/project-agent-toolkit/scripts/governance.py check --root C:\path\to\project
 python plugins/project-agent-toolkit/scripts/governance.py generate --root C:\path\to\project
 python plugins/project-agent-toolkit/scripts/governance.py route-test --root C:\path\to\project
@@ -73,6 +74,11 @@ from a clean configuration boundary.
 `generate` keeps platform-facing agent adapters synchronized with one canonical
 configuration. It checks by default; `--write` updates only managed files, and
 `--force` is required to adopt an unmanaged existing file.
+
+`context` combines policy routing with an optional project-owned capability
+map. It returns a small, contract-tested set of implementation owners and their
+declared dependencies, giving agents a bounded place to begin code inspection
+without pretending to generate an exhaustive dependency graph.
 
 `verify` selects validation profiles through the same task routes used for
 policy, runs project-owned commands, and writes a receipt containing the
@@ -120,9 +126,10 @@ fails on broken authority paths, invalid routes, missing links, duplicate
 long-form policy, excess always-loaded context, and unexpected runtime files in
 agent tooling directories. It also fails on stale generated adapters, broken
 route contracts, invalid validation graphs, unknown rule guards, and malformed
-evidence configuration. `coverage --strict` additionally rejects unrouted
-authorities, untested routes, unused validation profiles, and unguarded
-registered rules.
+evidence configuration. It also rejects stale capability owner paths and
+unknown or cyclic capability dependencies. `coverage --strict` additionally
+rejects unrouted authorities, untested routes, untested capabilities, unused
+validation profiles, and unguarded registered rules.
 
 All executable toolkit logic uses Python 3 and only the standard library. There
 are no Node.js, PowerShell, Bash, pip, or third-party runtime dependencies.
@@ -133,6 +140,8 @@ GitHub Actions YAML and plugin manifests remain declarative configuration.
 - Entrypoints are short indexes, not policy warehouses.
 - One document owns each durable rule.
 - Task routes use progressive disclosure.
+- Capability maps provide bounded implementation starting points separately
+  from policy routes.
 - Model selection is environment policy, not repository architecture.
 - Validation commands are project data.
 - Validation starts from a plausible failure and uses the least expensive check

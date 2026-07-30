@@ -3,5 +3,6 @@
 
 Read [.github/copilot-instructions.md](.github/copilot-instructions.md).
 Use [.agent-governance.json](.agent-governance.json) to load only the authorities routed for
-the current task and likely changed paths. Project-specific policy belongs
-in those authorities, not in this generated entrypoint.
+the current task and likely changed paths. When a capability map is
+configured, start code inspection from the owners returned by the toolkit's
+`context` command. Project-specific policy belongs in routed authorities.

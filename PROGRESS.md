@@ -23,13 +23,18 @@ governance layer.
 - Unit, structure, governance, hook, and CI guards are present.
 - Generated adapters, route contracts, validation profiles, content-bound
   evidence receipts, versioned migrations, and coverage reporting implemented.
+- Optional capability ownership maps give agents bounded, contract-tested
+  implementation starting points through the combined `context` command while
+  keeping project-specific subsystem knowledge in the consumer repository.
+- Iteration mode limits autonomous validation and test creation for volatile
+  work while preserving explicit checkpoint and release gates.
 - MCP-driven development declarations require executable proof categories and
   a production-off release proof when applicable.
 - Visual-change routing requires valid, fresh rendered artifacts, acceptance
   surface metadata, and explicit review evidence.
 - Receipt creation requires a Git-ignored evidence directory, and validation
   receipts fail when project state or supplied artifacts change during checks.
-- The schema-v4 regression suite contains 26 passing tests and CI covers Linux,
+- The schema-v4 regression suite contains 27 passing tests and CI covers Linux,
   Windows, and macOS.
 
 ## Open risks

@@ -7,7 +7,18 @@ description: Review and improve a repository's complete AI-agent setup, includin
 
 Find structural causes of unreliable agent work rather than adding more prose.
 
+## Iteration mode
+
+When the user is iterating on agent policy, inspect only the affected
+instruction surface, make the coherent policy change, self-review it, and run
+at most one cheapest relevant sanity check. Do not run the full audit, adapter,
+route, coverage, or focused-test sequence unless the user requests a
+checkpoint or audit gate. An explicit request for no validation skips the
+sanity check.
+
 ## Required audit
+
+Use the full sequence below outside iteration mode.
 
 1. Inspect the working tree before reading policy.
 2. Inventory every agent-facing file and every script or hook that enforces an
@@ -28,6 +39,7 @@ Find structural causes of unreliable agent work rather than adding more prose.
    python <plugin-root>/scripts/governance.py generate --root <project-root>
    python <plugin-root>/scripts/governance.py route-test --root <project-root>
    python <plugin-root>/scripts/governance.py coverage --root <project-root> --strict
+   python <plugin-root>/scripts/governance.py context --root <project-root> --task "<representative task>"
    ```
 
 6. Classify each issue by root cause:
@@ -36,6 +48,7 @@ Find structural causes of unreliable agent work rather than adding more prose.
    - excess always-loaded context;
    - duplicated or contradictory policy;
    - missing task routing;
+   - missing or stale capability ownership;
    - prose-only rule that should be mechanical;
    - stale state or handoff;
    - role ambiguity or unsafe delegation;
@@ -46,7 +59,7 @@ Find structural causes of unreliable agent work rather than adding more prose.
    generic process; keep domain rules with their project.
 8. Rank fixes by reliability and context saved, not by cosmetic neatness.
 9. After edits, rerun the audit, representative task routes, existing project
-   guards, and focused tests.
+   guards, and focused tests. Do not apply this step in iteration mode.
 
 ## Output
 
@@ -56,6 +69,7 @@ Lead with the outcome. Report:
 - always-loaded context before and after;
 - canonical authority order;
 - task routes introduced or corrected;
+- bounded capability ownership maps introduced or corrected;
 - rules converted to guards;
 - routing contracts and coverage gaps;
 - stale generated adapters;

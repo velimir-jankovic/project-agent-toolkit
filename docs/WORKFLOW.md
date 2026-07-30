@@ -13,6 +13,31 @@
    test. Add no test when a compiler, static check, guard, or existing test
    already proves the claim.
 
+## Iterate
+
+Treat work the user identifies as exploratory, prototypical, or expected to
+change repeatedly as iteration mode. Make the coherent implementation change,
+self-review the affected code, then run at most one cheapest relevant sanity
+check such as a parser, static check, or affected-target compile. Do not stack
+checks or run a routed profile that expands beyond this budget.
+
+Do not add tests for values, layout, presentation, tuning, or other volatile
+details. Add a test without prompting only when it protects a stable contract
+or regression expected to survive the current iteration and cheaper evidence
+cannot cover it. Do not invoke an independent verifier, broad suite, runtime
+capture, or checkpoint autonomously.
+
+An explicit user request for no validation skips the sanity check. Leave
+iteration mode when the user requests a particular check, checkpoint, review,
+or release gate.
+
+## Checkpoint
+
+At an explicit checkpoint, run focused tests for stable contracts, use one
+independent review when it can expose meaningful integration risk, and exercise
+the real workflow when acceptance depends on it. Do not create broad tests for
+volatile behavior merely to increase checkpoint evidence.
+
 ## Integrate
 
 Before independent review or `quality.py`, integrate every accepted slice,
@@ -24,9 +49,10 @@ review only when the acceptance surface changes.
 
 ## Verify
 
-Use the least expensive evidence capable of disproving the claim. For a bug
-fix, demonstrate the regression against pre-fix behavior when practical; if
-that is impractical, record why. Run `python scripts/quality.py` as this
+Outside iteration mode, use the least expensive evidence capable of disproving
+the claim. For a bug fix, demonstrate the regression against pre-fix behavior
+when practical; if that is impractical, record why. Run
+`python scripts/quality.py` as this
 repository's release gate. For plugin ingestion changes, also run the current
 Codex plugin and skill validators when available. Test count and coverage
 percentage are not completion criteria.

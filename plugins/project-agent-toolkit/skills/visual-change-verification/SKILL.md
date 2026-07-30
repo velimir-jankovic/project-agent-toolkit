@@ -8,7 +8,18 @@ description: Verify UI, drawing, modeling, animation, VFX, scene, terrain, map, 
 A build proves that visual code executes. It does not prove that the result
 looks correct.
 
+## Iteration mode
+
+When the project rules classify the work as iterative, do not capture,
+formally review, or validate the visual surface autonomously. Self-review the
+coherent implementation and use at most one cheapest relevant sanity check.
+Defer the rendered evidence workflow until the user requests a visual review,
+checkpoint, or release. An explicit request for no validation skips the sanity
+check.
+
 ## Workflow
+
+Use this workflow for an explicit visual review, checkpoint, or release.
 
 1. Read the routed visual, architecture, rules, workflow, and state
    authorities.

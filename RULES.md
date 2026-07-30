@@ -17,6 +17,12 @@
   protect an observable contract not already proved by a cheaper check. Do not
   mirror implementation, assert trivial details, duplicate coverage, or treat
   test count and coverage percentage as outcomes.
+- When work is expected to iterate, self-review the coherent slice and run at
+  most one cheapest relevant sanity check. Do not add tests for volatile
+  details, stack validation commands, invoke an independent verifier, or run a
+  full gate. A new test is justified only for a stable contract or regression
+  expected to survive the iteration. An explicit user request for no
+  validation skips even the sanity check.
 - A check that did not run is not reported as evidence.
 - Evidence receipts identify dirty source contents, not only dirty filenames,
   and validation that mutates the tested source state cannot pass.

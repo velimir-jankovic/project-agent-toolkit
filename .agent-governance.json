@@ -219,6 +219,82 @@
       ]
     }
   ],
+  "capabilities": [
+    {
+      "id": "governance-engine",
+      "purpose": "Own governance schema validation, routing, context, evidence, and CLI behavior.",
+      "terms": [
+        "governance schema",
+        "routing",
+        "capability ownership",
+        "context command",
+        "evidence receipt"
+      ],
+      "paths": [
+        "plugins/project-agent-toolkit/scripts/governance.py",
+        "tests/test_governance.py"
+      ],
+      "owners": [
+        "plugins/project-agent-toolkit/scripts/governance.py",
+        "plugins/project-agent-toolkit/skills/project-agent-audit/references/governance-schema.md",
+        "tests/test_governance.py"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "governed-change-workflow",
+      "purpose": "Own the reusable agent workflow that consumes routed policy and capability context.",
+      "terms": [
+        "governed change",
+        "agent workflow"
+      ],
+      "paths": [
+        "plugins/project-agent-toolkit/skills/governed-project-change/**"
+      ],
+      "owners": [
+        "plugins/project-agent-toolkit/skills/governed-project-change/SKILL.md",
+        "plugins/project-agent-toolkit/skills/governed-project-change/references/execution-contract.md"
+      ],
+      "depends_on": [
+        "governance-engine"
+      ]
+    }
+  ],
+  "capability_tests": [
+    {
+      "id": "governance-context",
+      "task": "add capability ownership to governance routing",
+      "paths": [
+        "plugins/project-agent-toolkit/scripts/governance.py"
+      ],
+      "expect_capabilities": [
+        "governance-engine"
+      ],
+      "expect_owners": [
+        "plugins/project-agent-toolkit/scripts/governance.py",
+        "plugins/project-agent-toolkit/skills/project-agent-audit/references/governance-schema.md",
+        "tests/test_governance.py"
+      ]
+    },
+    {
+      "id": "governed-workflow-context",
+      "task": "change the governed change agent workflow",
+      "paths": [
+        "plugins/project-agent-toolkit/skills/governed-project-change/SKILL.md"
+      ],
+      "expect_capabilities": [
+        "governed-change-workflow",
+        "governance-engine"
+      ],
+      "expect_owners": [
+        "plugins/project-agent-toolkit/skills/governed-project-change/SKILL.md",
+        "plugins/project-agent-toolkit/skills/governed-project-change/references/execution-contract.md",
+        "plugins/project-agent-toolkit/scripts/governance.py",
+        "plugins/project-agent-toolkit/skills/project-agent-audit/references/governance-schema.md",
+        "tests/test_governance.py"
+      ]
+    }
+  ],
   "rules": [
     {
       "id": "project-neutral",
@@ -265,7 +341,8 @@
   "limits": {
     "entrypoint_max_lines": 120,
     "always_loaded_max_chars": 30000,
-    "duplicate_paragraph_min_chars": 180
+    "duplicate_paragraph_min_chars": 180,
+    "capability_owner_max_count": 8
   },
   "tooling": {
     "roots": [

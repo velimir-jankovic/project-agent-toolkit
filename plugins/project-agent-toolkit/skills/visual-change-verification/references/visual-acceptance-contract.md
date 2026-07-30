@@ -1,5 +1,9 @@
 # Visual acceptance contract
 
+This contract applies at an explicit visual review, checkpoint, or release.
+During iteration mode, rendered capture and review are deferred unless the user
+requests them.
+
 ## Evidence matrix
 
 Select only rows relevant to the change, but do not omit a materially different

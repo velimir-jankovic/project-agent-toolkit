@@ -32,7 +32,10 @@ of copying that policy into every agent entrypoint.
    project. The plugin must remain project-neutral; project-specific rules stay
    in the target repository.
 6. Add representative `route_tests` before managing adapters. Every non-default
-   route needs at least one test.
+   route needs at least one test. In a mature repository where subsystem
+   ownership is repeatedly rediscovered, add the smallest useful
+   `capabilities` map plus `capability_tests`; do not attempt to model the
+   entire dependency graph.
 7. Preview and then write generated adapters:
 
    ```console
@@ -54,7 +57,7 @@ of copying that policy into every agent entrypoint.
    python <plugin-root>/scripts/governance.py audit --root <project-root>
    python <plugin-root>/scripts/governance.py route-test --root <project-root>
    python <plugin-root>/scripts/governance.py coverage --root <project-root> --strict
-   python <plugin-root>/scripts/governance.py route --root <project-root> --task "<representative task>"
+   python <plugin-root>/scripts/governance.py context --root <project-root> --task "<representative task>"
    ```
 
 11. Test at least one architecture task, one implementation task, and one

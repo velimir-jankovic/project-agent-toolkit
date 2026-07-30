@@ -11,19 +11,28 @@ for understanding the code.
 ## Workflow
 
 1. Read the concise agent entrypoint and inspect version-control state.
-2. Route the request:
+2. Resolve task-scoped policy and capability owners:
 
    ```console
-   python <plugin-root>/scripts/governance.py route \
+   python <plugin-root>/scripts/governance.py context \
      --root <project-root> \
      --task "<user request>" \
      --path <likely changed path>
    ```
 
-3. Read every returned authority completely. Read additional implementation
-   files only as the task requires.
+3. Read every returned authority completely. Start implementation inspection
+   with the returned capability owners. Broaden beyond them only when the
+   traced call path, dependency, or observed failure requires it. Projects
+   without a capability map return policy normally and require targeted
+   discovery.
 4. Classify the request: answer, diagnose, design, implement, review, or
    monitor. Do not infer authorization for a materially different action.
+   Also classify whether the user expects repeated iteration. In iteration
+   mode, self-review the coherent slice and run at most one cheapest relevant
+   sanity check. Do not test volatile details, stack checks, run a full routed
+   profile, or invoke independent verification. Add a test only for a stable
+   contract or regression expected to survive the iteration. An explicit
+   request for no validation skips even the sanity check.
 5. For a change, decide capability ownership before editing:
 
    - shared capability belongs to the shared owner;
@@ -33,7 +42,8 @@ for understanding the code.
 6. Make the smallest coherent change. Prefer existing mechanisms, remove
    duplication, and treat maintenance cost as part of correctness. Preserve
    unrelated edits.
-7. Before independent review or project-wide validation, the root integrates
+7. Before independent review or project-wide validation outside iteration
+   mode, the root integrates
    every accepted slice, resolves overlaps and TODOs, and self-reviews the
    current diff against ownership and acceptance criteria. Treat that state as
    the candidate freeze. Delegated workers run only explicitly assigned
@@ -43,7 +53,7 @@ for understanding the code.
    root ownership, then request targeted closure of those findings. Repeat the
    complete review only when a fix changes the architecture, public boundary,
    or acceptance surface.
-9. Validate through routed profiles:
+9. Outside iteration mode, validate through routed profiles:
 
    ```console
    python <plugin-root>/scripts/governance.py verify \
@@ -67,11 +77,17 @@ for understanding the code.
    extends it on the same source. Run the broader profile once after the
    candidate freeze unless the narrower result is needed to guide ongoing
    implementation.
+   In iteration mode, replace this step with the single sanity check described
+   above; a routed validation profile may exceed that budget and does not
+   authorize running the broader gate. At an explicit checkpoint, use focused
+   tests for stable contracts, one independent review when useful, and the
+   real workflow when acceptance depends on it.
 10. Update canonical state only when the durable objective, decision, or next
    action changed.
-11. Before claiming completion, use
+11. Before claiming verified completion, use
    [execution-contract.md](references/execution-contract.md) and cite the
-   current evidence receipt.
+   current evidence receipt. An iteration-mode handoff reports its self-review
+   and single sanity check directly; it does not require an evidence receipt.
 
 ## Delegation
 

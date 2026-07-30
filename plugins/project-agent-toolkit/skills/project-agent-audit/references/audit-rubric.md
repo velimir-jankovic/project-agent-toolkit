@@ -12,6 +12,8 @@
 - Are unrelated domains always loaded?
 - Are historical receipts mixed with live instructions?
 - Can a task obtain all required policy from deterministic routes?
+- Can a task start from a bounded, current implementation owner set instead of
+  rediscovering the subsystem through broad repository reads?
 
 ## Enforcement
 

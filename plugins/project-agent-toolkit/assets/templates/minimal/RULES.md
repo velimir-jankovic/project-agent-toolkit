@@ -14,6 +14,12 @@ reliably; do not multiply guards for the same invariant.
   an observable contract not already proved by a cheaper check. Do not mirror
   implementation, test trivial details, duplicate coverage, or optimize for
   test count.
+- When work is expected to iterate, self-review the coherent slice and run at
+  most one cheapest relevant sanity check. Do not add tests for volatile
+  details, stack validation commands, invoke an independent verifier, or run a
+  full gate. A new test is justified only for a stable contract or regression
+  expected to survive the iteration. An explicit user request for no
+  validation skips even the sanity check.
 - Do not claim evidence that was not produced from the current source contents.
 - Visual work requires fresh rendered evidence from the actual acceptance
   surface and concrete inspection checks.

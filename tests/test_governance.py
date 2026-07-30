@@ -154,6 +154,96 @@ class GovernanceTests(unittest.TestCase):
             self.assertIn("implementation", details["routes"])
             self.assertNotIn("visual", details["routes"])
 
+    def test_context_maps_capability_owners_and_rejects_stale_maps(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "minimal", False)
+            source = root / "src"
+            source.mkdir()
+            source.joinpath("draft.py").write_text(
+                "def draft():\n    pass\n",
+                encoding="utf-8",
+            )
+            source.joinpath("build.py").write_text(
+                "def build():\n    pass\n",
+                encoding="utf-8",
+            )
+            config_path = root / ".agent-governance.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["capabilities"] = [
+                {
+                    "id": "draft",
+                    "purpose": "Author legal draft transitions.",
+                    "terms": ["draft"],
+                    "paths": ["src/draft.py"],
+                    "owners": ["src/draft.py"],
+                    "depends_on": ["build"],
+                },
+                {
+                    "id": "build",
+                    "purpose": "Resolve immutable build identities.",
+                    "terms": ["build identity"],
+                    "paths": ["src/build.py"],
+                    "owners": ["src/build.py"],
+                    "depends_on": [],
+                },
+            ]
+            config["capability_tests"] = [
+                {
+                    "id": "draft-context",
+                    "task": "add a draft choice",
+                    "paths": ["src/draft.py"],
+                    "expect_capabilities": ["draft", "build"],
+                    "expect_owners": [
+                        "src/draft.py",
+                        "src/build.py",
+                    ],
+                }
+            ]
+            config_path.write_text(
+                json.dumps(config, indent=2),
+                encoding="utf-8",
+            )
+
+            details = governance.context_details(
+                config,
+                "add a draft choice",
+                ["src/draft.py"],
+            )
+            self.assertEqual(
+                [item["id"] for item in details["capabilities"]],
+                ["draft", "build"],
+            )
+            self.assertTrue(details["capabilities"][0]["direct"])
+            self.assertFalse(details["capabilities"][1]["direct"])
+            self.assertEqual(
+                details["owners"],
+                ["src/draft.py", "src/build.py"],
+            )
+            findings, metrics = governance.audit(root)
+            self.assertFalse(
+                [
+                    finding
+                    for finding in findings
+                    if finding.code.startswith("capability")
+                ],
+                findings,
+            )
+            self.assertEqual(metrics["capability_count"], 2)
+            self.assertFalse(governance.capability_test_findings(config))
+            self.assertTrue(governance.coverage_report(config)["complete"])
+
+            config["capabilities"][0]["owners"] = ["src/missing.py"]
+            config["capabilities"][0]["depends_on"] = ["missing"]
+            config_path.write_text(
+                json.dumps(config, indent=2),
+                encoding="utf-8",
+            )
+            findings, _ = governance.audit(root)
+            codes = {finding.code for finding in findings}
+            self.assertIn("capability.owner-missing", codes)
+            self.assertIn("capability.unknown-dependency", codes)
+
     def test_tooling_pollution_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
