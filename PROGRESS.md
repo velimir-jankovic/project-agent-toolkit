@@ -26,6 +26,9 @@ governance layer.
 - Optional capability ownership maps give agents bounded, contract-tested
   implementation starting points through the combined `context` command while
   keeping project-specific subsystem knowledge in the consumer repository.
+- Optional changed-path coverage rejects scoped local or branch changes without
+  a direct capability owner and prefers specific feature globs over broad
+  subsystem roots.
 - Iteration mode limits autonomous validation and test creation for volatile
   work while preserving explicit checkpoint and release gates.
 - MCP-driven development declarations require executable proof categories and

@@ -13,7 +13,9 @@ The repository has four independent layers:
 Skills define agent behavior. The CLI owns deterministic enforcement. Templates
 are data copied additively into a project. A target project's
 `.agent-governance.json` owns its authority graph, routes, budgets, tooling
-allowlist, and optional validation commands.
+allowlist, optional validation commands, bounded capability ownership map, and
+optional changed-path coverage scope. The guard selects the most-specific
+matching capability and rejects scoped changes with no direct owner.
 
 No target project imports this repository as runtime application code.
 Marketplace installation supplies skills and their packaged CLI; contributors

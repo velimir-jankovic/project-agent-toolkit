@@ -43,18 +43,29 @@ for understanding the code.
 6. Make the smallest coherent change. Prefer existing mechanisms, remove
    duplication, and treat maintenance cost as part of correctness. Preserve
    unrelated edits.
-7. Before independent review or project-wide validation outside iteration
+7. When `capability_coverage` is configured, check the actual changed paths
+   before handoff:
+
+   ```console
+   python <plugin-root>/scripts/governance.py capability-check \
+     --root <project-root> --changed
+   ```
+
+   Assign an uncovered scoped path to the existing capability that truly owns
+   it, or declare and contract-test a new capability. Do not add an exclusion
+   merely to silence the guard.
+8. Before independent review or project-wide validation outside iteration
    mode, the root integrates
    every accepted slice, resolves overlaps and TODOs, and self-reviews the
    current diff against ownership and acceptance criteria. Treat that state as
    the candidate freeze. Delegated workers run only explicitly assigned
    focused checks; the root owns shared routed validation.
-8. When independent verification is warranted or requested, give the verifier
+9. When independent verification is warranted or requested, give the verifier
    the frozen candidate and its acceptance criteria. Resolve findings under
    root ownership, then request targeted closure of those findings. Repeat the
    complete review only when a fix changes the architecture, public boundary,
    or acceptance surface.
-9. Outside iteration mode, validate through routed profiles:
+10. Outside iteration mode, validate through routed profiles:
 
    ```console
    python <plugin-root>/scripts/governance.py verify \
@@ -83,9 +94,9 @@ for understanding the code.
    authorize running the broader gate. At an explicit checkpoint, use focused
    tests for stable contracts, one independent review when useful, and the
    real workflow when acceptance depends on it.
-10. Update canonical state only when the durable objective, decision, or next
+11. Update canonical state only when the durable objective, decision, or next
    action changed.
-11. Before claiming verified completion, use
+12. Before claiming verified completion, use
    [execution-contract.md](references/execution-contract.md) and cite the
    current evidence receipt. An iteration-mode handoff reports its self-review
    and single sanity check directly; it does not require an evidence receipt.

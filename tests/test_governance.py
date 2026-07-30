@@ -244,6 +244,116 @@ class GovernanceTests(unittest.TestCase):
             self.assertIn("capability.owner-missing", codes)
             self.assertIn("capability.unknown-dependency", codes)
 
+    def test_changed_path_coverage_prefers_specific_owners_and_rejects_gaps(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            governance.initialize(root, "minimal", False)
+            source = root / "src"
+            drafts = source / "drafts"
+            generated = source / "generated"
+            tools = root / "tools"
+            drafts.mkdir(parents=True)
+            generated.mkdir()
+            tools.mkdir()
+            source.joinpath("runtime.py").write_text("RUNTIME = 1\n", encoding="utf-8")
+            drafts.joinpath("card.py").write_text("CARD = 1\n", encoding="utf-8")
+
+            config_path = root / ".agent-governance.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["capabilities"] = [
+                {
+                    "id": "runtime",
+                    "purpose": "Own the broad runtime.",
+                    "terms": ["runtime"],
+                    "paths": ["src/**"],
+                    "owners": ["src/runtime.py"],
+                    "depends_on": [],
+                },
+                {
+                    "id": "draft",
+                    "purpose": "Own bounded draft behavior.",
+                    "terms": ["draft"],
+                    "paths": ["src/drafts/**"],
+                    "owners": ["src/drafts/card.py"],
+                    "depends_on": ["runtime"],
+                },
+            ]
+            config["capability_tests"] = [
+                {
+                    "id": "draft-context",
+                    "task": "change a draft",
+                    "paths": ["src/drafts/card.py"],
+                    "expect_capabilities": ["draft", "runtime"],
+                    "expect_owners": ["src/drafts/card.py", "src/runtime.py"],
+                }
+            ]
+            config["capability_coverage"] = {
+                "include": ["src/**", "tools/**"],
+                "exclude": ["src/generated/**"],
+            }
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+            coverage_findings, scope_count = governance.validate_capability_coverage(
+                config
+            )
+            self.assertEqual(coverage_findings, [])
+            self.assertEqual(scope_count, 2)
+            details = governance.capability_coverage_details(
+                config,
+                [
+                    "src/drafts/card.py",
+                    "src/runtime.py",
+                    "src/generated/cache.py",
+                    "tools/new.py",
+                ],
+            )
+            self.assertEqual(
+                details["paths"],
+                [
+                    {
+                        "path": "src/drafts/card.py",
+                        "capabilities": ["draft"],
+                    },
+                    {
+                        "path": "src/runtime.py",
+                        "capabilities": ["runtime"],
+                    },
+                    {"path": "tools/new.py", "capabilities": []},
+                ],
+            )
+            self.assertEqual(details["ignored"], ["src/generated/cache.py"])
+            self.assertEqual(details["uncovered"], ["tools/new.py"])
+            self.assertFalse(details["complete"])
+
+            subprocess.run(["git", "init", "--quiet"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "agent@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Agent Test"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "--quiet", "-m", "base"],
+                cwd=root,
+                check=True,
+            )
+            source.joinpath("runtime.py").write_text("RUNTIME = 2\n", encoding="utf-8")
+            tools.joinpath("new.py").write_text("NEW = 1\n", encoding="utf-8")
+
+            changed = governance.git_changed_paths(
+                root,
+                include_dirty=True,
+                base=None,
+            )
+            self.assertEqual(changed, ["src/runtime.py", "tools/new.py"])
+
     def test_tooling_pollution_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

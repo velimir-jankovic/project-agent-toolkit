@@ -14,6 +14,8 @@ version `4` is current.
 - `route_tests`: deterministic routing contracts.
 - `capabilities`: optional task/path routing to concise implementation owners.
 - `capability_tests`: deterministic capability ownership contracts.
+- `capability_coverage`: optional changed-path scope that rejects uncategorized
+  implementation changes.
 - `rules`: registered durable rules and their guards.
 - `development_interfaces`: optional development-only control surfaces,
   including MCP activation and production policy.
@@ -110,9 +112,41 @@ Capability tests keep project-specific ownership maps from silently drifting:
 }
 ```
 
-The map is not an exhaustive dependency graph and does not replace code
-inspection. It is a bounded starting surface that prevents every task from
-rediscovering subsystem ownership through broad repository reads.
+When several capability path globs match, the longest literal prefix wins.
+This lets a broad subsystem capability cover new files while a more specific
+feature capability remains the direct starting point.
+
+The optional changed-path guard makes declared ownership mechanically
+maintainable:
+
+```json
+{
+  "capability_coverage": {
+    "include": ["src/**", "scripts/**"],
+    "exclude": ["src/generated/**"]
+  }
+}
+```
+
+Run it against local work, explicit paths, or a branch diff:
+
+```console
+governance.py capability-check --root . --changed
+governance.py capability-check --root . --base origin/main --changed
+governance.py capability-check --root . --path src/new_feature.py
+```
+
+Every changed path inside `include` and outside `exclude` must match at least
+one capability path or exact owner. The command reports the most-specific
+direct owner and fails on gaps. CI should pass its merge-base revision through
+`--base`; local hooks and agents use `--changed`. This guarantees that scoped
+changes remain categorized, while owner existence and capability tests guard
+the declared map. It cannot infer that a file's semantic responsibility
+changed without its path changing, so review still owns that judgment.
+
+The map is not an exhaustive call graph and does not replace code inspection.
+It is a bounded starting surface that prevents every task from rediscovering
+subsystem ownership through broad repository reads.
 
 ## Generated adapter
 

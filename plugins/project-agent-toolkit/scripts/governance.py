@@ -304,6 +304,45 @@ def task_term_matches(task: str, term: str) -> bool:
     return re.search(rf"(?<!\w){pattern}(?!\w)", task.lower()) is not None
 
 
+def glob_specificity(pattern: str) -> tuple[int, int, int]:
+    """Rank matching globs so a bounded owner wins over a broad family root."""
+    normalized = posix(pattern)
+    wildcard = re.search(r"[*?[]", normalized)
+    literal_prefix = normalized if wildcard is None else normalized[: wildcard.start()]
+    literal_count = len(re.sub(r"[*?[\]]", "", normalized))
+    wildcard_count = sum(normalized.count(token) for token in ("*", "?", "["))
+    return (len(literal_prefix), literal_count, -wildcard_count)
+
+
+def capability_path_ids(config: dict[str, Any], path: str) -> list[str]:
+    """Return the most-specific direct capability owners for one path."""
+    normalized = posix(path)
+    matches: list[tuple[str, tuple[int, int, int]]] = []
+    for capability in config.get("capabilities", []):
+        if not isinstance(capability, dict):
+            continue
+        identifier = capability.get("id")
+        if not isinstance(identifier, str):
+            continue
+        best: tuple[int, int, int] | None = None
+        for pattern in capability.get("paths", []):
+            if not isinstance(pattern, str):
+                continue
+            if fnmatch.fnmatchcase(normalized, pattern):
+                score = glob_specificity(pattern)
+                best = score if best is None or score > best else best
+        for owner in capability.get("owners", []):
+            if isinstance(owner, str) and posix(owner) == normalized:
+                score = (len(normalized) + 1, len(normalized) + 1, 0)
+                best = score if best is None or score > best else best
+        if best is not None:
+            matches.append((identifier, best))
+    if not matches:
+        return []
+    highest = max(score for _, score in matches)
+    return [identifier for identifier, score in matches if score == highest]
+
+
 def audit_codex_configuration(
     root: Path,
 ) -> tuple[list[Finding], dict[str, Any]]:
@@ -423,6 +462,7 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         "authority_count": 0,
         "route_count": 0,
         "capability_count": 0,
+        "capability_coverage_scope_count": 0,
         "development_interface_count": 0,
         "visual_route_count": 0,
         "codex_config_present": False,
@@ -654,6 +694,11 @@ def audit(root: Path) -> tuple[list[Finding], dict[str, Any]]:
     )
     findings.extend(capability_findings)
     metrics["capability_count"] = len(capability_ids)
+    capability_coverage_findings, capability_coverage_scope_count = (
+        validate_capability_coverage(config)
+    )
+    findings.extend(capability_coverage_findings)
+    metrics["capability_coverage_scope_count"] = capability_coverage_scope_count
 
     visual_validation = config.get("visual_validation")
     if visual_validation is not None and not isinstance(visual_validation, dict):
@@ -1670,6 +1715,179 @@ def validate_capabilities(
     return findings, set(capabilities)
 
 
+def validate_capability_coverage(
+    config: dict[str, Any],
+) -> tuple[list[Finding], int]:
+    coverage = config.get("capability_coverage")
+    if coverage is None:
+        return [], 0
+    if not isinstance(coverage, dict):
+        return (
+            [
+                Finding(
+                    "error",
+                    "capability-coverage.invalid",
+                    "capability_coverage must be an object",
+                    CONFIG_NAME,
+                )
+            ],
+            0,
+        )
+    findings: list[Finding] = []
+    include = coverage.get("include", [])
+    exclude = coverage.get("exclude", [])
+    for key, value in (("include", include), ("exclude", exclude)):
+        if (
+            not isinstance(value, list)
+            or not all(isinstance(item, str) and item.strip() for item in value)
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    f"capability-coverage.{key}",
+                    (
+                        f"capability_coverage.{key} must be an array of "
+                        "non-empty project-relative globs"
+                    ),
+                    CONFIG_NAME,
+                )
+            )
+            continue
+        for pattern in value:
+            try:
+                normalize_project_relative(pattern)
+            except ValueError as exc:
+                findings.append(
+                    Finding(
+                        "error",
+                        f"capability-coverage.{key}-path",
+                        str(exc),
+                        CONFIG_NAME,
+                    )
+                )
+    if isinstance(include, list) and not include:
+        findings.append(
+            Finding(
+                "error",
+                "capability-coverage.empty",
+                "configured capability_coverage needs at least one include glob",
+                CONFIG_NAME,
+            )
+        )
+    return findings, len(include) if isinstance(include, list) else 0
+
+
+def capability_coverage_details(
+    config: dict[str, Any],
+    paths: list[str],
+) -> dict[str, Any]:
+    coverage = config.get("capability_coverage")
+    if not isinstance(coverage, dict):
+        return {
+            "enabled": False,
+            "paths": [],
+            "ignored": list(dict.fromkeys(posix(path) for path in paths)),
+            "uncovered": [],
+            "invalid": [],
+            "complete": True,
+        }
+    include = [
+        str(pattern)
+        for pattern in coverage.get("include", [])
+        if isinstance(pattern, str)
+    ]
+    exclude = [
+        str(pattern)
+        for pattern in coverage.get("exclude", [])
+        if isinstance(pattern, str)
+    ]
+    scoped: list[dict[str, Any]] = []
+    ignored: list[str] = []
+    uncovered: list[str] = []
+    invalid: list[str] = []
+    seen: set[str] = set()
+    for raw_path in paths:
+        try:
+            path = normalize_project_relative(raw_path)
+        except ValueError:
+            invalid.append(raw_path)
+            continue
+        if path in seen:
+            continue
+        seen.add(path)
+        if not any(fnmatch.fnmatchcase(path, pattern) for pattern in include):
+            ignored.append(path)
+            continue
+        if any(fnmatch.fnmatchcase(path, pattern) for pattern in exclude):
+            ignored.append(path)
+            continue
+        capability_ids = capability_path_ids(config, path)
+        scoped.append({"path": path, "capabilities": capability_ids})
+        if not capability_ids:
+            uncovered.append(path)
+    return {
+        "enabled": True,
+        "paths": scoped,
+        "ignored": ignored,
+        "uncovered": uncovered,
+        "invalid": invalid,
+        "complete": not uncovered and not invalid,
+    }
+
+
+def git_changed_paths(
+    root: Path,
+    *,
+    include_dirty: bool,
+    base: str | None,
+) -> list[str]:
+    def run(arguments: list[str]) -> list[str]:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            message = result.stderr.strip() or result.stdout.strip()
+            raise ValueError(message or f"git {' '.join(arguments)} failed")
+        return [
+            normalize_project_relative(line)
+            for line in result.stdout.splitlines()
+            if line.strip()
+        ]
+
+    inside = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        raise ValueError(f"{root} is not a Git worktree")
+
+    changed: list[str] = []
+    if base:
+        changed.extend(
+            run(
+                [
+                    "diff",
+                    "--name-only",
+                    "--diff-filter=ACMRD",
+                    f"{base}...HEAD",
+                ]
+            )
+        )
+    if include_dirty:
+        changed.extend(
+            run(["diff", "--name-only", "--diff-filter=ACMRD", "HEAD"])
+        )
+        changed.extend(run(["ls-files", "--others", "--exclude-standard"]))
+    return list(dict.fromkeys(changed))
+
+
 def capability_details(
     config: dict[str, Any],
     task: str,
@@ -1686,18 +1904,14 @@ def capability_details(
     direct = [
         str(capability["id"])
         for capability in ordered
-        if (
-            any(
-                task_term_matches(task_lower, str(term))
-                for term in capability.get("terms", [])
-            )
-            or any(
-                fnmatch.fnmatchcase(posix(path), str(pattern))
-                for path in paths
-                for pattern in capability.get("paths", [])
-            )
+        if any(
+            task_term_matches(task_lower, str(term))
+            for term in capability.get("terms", [])
         )
     ]
+    for path in paths:
+        direct.extend(capability_path_ids(config, path))
+    direct = list(dict.fromkeys(direct))
 
     selected: list[str] = []
 
@@ -2937,6 +3151,23 @@ def build_parser() -> argparse.ArgumentParser:
     coverage_parser.add_argument("--json", action="store_true")
     coverage_parser.add_argument("--strict", action="store_true")
 
+    capability_check_parser = subparsers.add_parser(
+        "capability-check",
+        help="reject changed scoped paths without a direct capability owner",
+    )
+    capability_check_parser.add_argument("--root", type=Path, default=Path.cwd())
+    capability_check_parser.add_argument("--path", action="append", default=[])
+    capability_check_parser.add_argument(
+        "--changed",
+        action="store_true",
+        help="include staged, unstaged, and untracked worktree paths",
+    )
+    capability_check_parser.add_argument(
+        "--base",
+        help="include paths changed from the merge base with this revision",
+    )
+    capability_check_parser.add_argument("--json", action="store_true")
+
     upgrade_parser = subparsers.add_parser("upgrade", help="migrate governance config safely")
     upgrade_parser.add_argument("--root", type=Path, default=Path.cwd())
     upgrade_parser.add_argument("--write", action="store_true")
@@ -3077,6 +3308,56 @@ def main(argv: list[str] | None = None) -> int:
                 if key != "complete" and value:
                     print(f"  {key}: {value}")
         return 1 if args.strict and not report["complete"] else 0
+    if args.command == "capability-check":
+        config, config_findings = load_config(root)
+        if config is None:
+            for finding in config_findings:
+                print(f"ERROR {finding.message}", file=sys.stderr)
+            return 1
+        coverage_findings, _ = validate_capability_coverage(config)
+        if coverage_findings:
+            for finding in coverage_findings:
+                print(
+                    f"{finding.severity.upper()} {finding.code}: {finding.message}",
+                    file=sys.stderr,
+                )
+            return 1
+        paths = list(args.path)
+        use_dirty = args.changed or (not args.path and not args.base)
+        try:
+            paths.extend(
+                git_changed_paths(
+                    root,
+                    include_dirty=use_dirty,
+                    base=args.base,
+                )
+            )
+        except ValueError as exc:
+            print(f"capability-check: {exc}", file=sys.stderr)
+            return 1
+        details = capability_coverage_details(config, paths)
+        if args.json:
+            print(json.dumps(details, indent=2))
+        else:
+            if not details["enabled"]:
+                print("capability-check: disabled")
+            elif details["complete"]:
+                print(
+                    "capability-check: OK "
+                    f"({len(details['paths'])} scoped path(s))"
+                )
+            else:
+                for path in details["uncovered"]:
+                    print(
+                        f"ERROR capability-coverage.unowned: {path}",
+                        file=sys.stderr,
+                    )
+                for path in details["invalid"]:
+                    print(
+                        f"ERROR capability-coverage.invalid-path: {path}",
+                        file=sys.stderr,
+                    )
+        return 0 if details["complete"] else 1
     if args.command == "upgrade":
         config, config_findings = load_config(root)
         if config is None:

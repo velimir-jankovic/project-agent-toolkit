@@ -231,7 +231,9 @@
         "evidence receipt"
       ],
       "paths": [
+        ".agent-governance.json",
         "plugins/project-agent-toolkit/scripts/governance.py",
+        "plugins/project-agent-toolkit/skills/project-agent-audit/**",
         "tests/test_governance.py"
       ],
       "owners": [
@@ -295,6 +297,16 @@
       ]
     }
   ],
+  "capability_coverage": {
+    "include": [
+      ".agent-governance.json",
+      "plugins/project-agent-toolkit/scripts/governance.py",
+      "plugins/project-agent-toolkit/skills/project-agent-audit/**",
+      "plugins/project-agent-toolkit/skills/governed-project-change/**",
+      "tests/test_governance.py"
+    ],
+    "exclude": []
+  },
   "rules": [
     {
       "id": "project-neutral",

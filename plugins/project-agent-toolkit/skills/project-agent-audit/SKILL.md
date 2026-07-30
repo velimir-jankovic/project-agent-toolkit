@@ -40,6 +40,7 @@ Use the full sequence below outside iteration mode.
    python <plugin-root>/scripts/governance.py route-test --root <project-root>
    python <plugin-root>/scripts/governance.py coverage --root <project-root> --strict
    python <plugin-root>/scripts/governance.py context --root <project-root> --task "<representative task>"
+   python <plugin-root>/scripts/governance.py capability-check --root <project-root> --changed
    ```
 
 6. Classify each issue by root cause:
@@ -70,6 +71,7 @@ Lead with the outcome. Report:
 - canonical authority order;
 - task routes introduced or corrected;
 - bounded capability ownership maps introduced or corrected;
+- changed-path ownership scopes and remaining semantic-review limits;
 - rules converted to guards;
 - routing contracts and coverage gaps;
 - stale generated adapters;
